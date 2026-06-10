@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect
 
 app = Flask(__name__)
 
@@ -6,8 +6,22 @@ app = Flask(__name__)
 def inicio():
     return render_template('index.html')
 
-@app.route('/login-gestor')
+@app.route('/login-gestor', methods=['GET', 'POST'])
 def login_gestor():
+
+    if request.method == 'POST':
+
+        login = request.form.get('login')
+        senha = request.form.get('senha')
+
+        if login == 'gestor1' and senha == 'gestor2026':
+            return redirect('/dashboard-gestor')
+
+        return render_template(
+            'login_gestor.html',
+            erro='Login ou senha inválidos'
+        )
+
     return render_template('login_gestor.html')
 
 @app.route('/login-colaborador')
