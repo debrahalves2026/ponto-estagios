@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Calendário do Núcleo</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+
+<body>
+
+<div class="sidebar">
+
+    <h2>Ponto Web</h2>
+
+    <ul>
+        <li><a href="/dashboard-gestor">Dashboard</a></li>
+        <li><a href="/cadastro-colaborador">Cadastrar Colaborador</a></li>
+        <li><a href="/colaboradores">Colaboradores</a></li>
+        <li><a href="/solicitacoes-ajuste">Solicitações de Ajuste</a></li>
+        <li><a href="/calendario">Calendário</a></li>
+        <li><a href="#">Relatórios</a></li>
+    </ul>
+
+</div>
+
+<div class="conteudo">
+
+    <h1>Calendário do Núcleo</h1>
+
+    <form>
+
+        <label>Título do Evento</label>
+        <br><br>
+
+        <input type="text" placeholder="Ex.: Home Office Equipe">
+        <br><br>
+
+        <label>Tipo de Evento</label>
+        <br><br>
+
+        <select>
+            <option>Home Office</option>
+            <option>Feriado</option>
+            <option>Ponto Facultativo</option>
+            <option>Reunião</option>
+            <option>Evento</option>
+        </select>
+
+        <br><br>
+
+        <label>Data</label>
+        <br><br>
+
+        <input type="date">
+
+        <br><br>
+
+        <label>Descrição</label>
+        <br><br>
+
+        <textarea rows="4"></textarea>
+
+        <br><br>
+
+        <button type="submit">
+            Adicionar Evento
+        </button>
+
+    </form>
+
+    <hr>
+
+    <h2>Eventos Cadastrados</h2>
+
+    <table border="1" cellpadding="10">
+
+        <tr>
+            <th>Data</th>
+            <th>Tipo</th>
+            <th>Título</th>
+        </tr>
+
+        <tr>
+            <td>15/06/2026</td>
+            <td>Home Office</td>
+            <td>Equipe NPP</td>
+        </tr>
+
+    </table>
+
+</div>
+
+</body>
+</html>

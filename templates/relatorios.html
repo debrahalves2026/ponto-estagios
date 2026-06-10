@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatórios</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+
+<body>
+
+<div class="sidebar">
+
+    <h2>Ponto Web</h2>
+
+    <ul>
+        <li><a href="/dashboard-gestor">Dashboard</a></li>
+        <li><a href="/cadastro-colaborador">Cadastrar Colaborador</a></li>
+        <li><a href="/colaboradores">Colaboradores</a></li>
+        <li><a href="/solicitacoes-ajuste">Solicitações de Ajuste</a></li>
+        <li><a href="/calendario">Calendário</a></li>
+        <li><a href="/relatorios">Relatórios</a></li>
+    </ul>
+
+</div>
+
+<div class="conteudo">
+
+    <h1>Relatórios</h1>
+
+    <h2>Relatório Individual</h2>
+
+    <select>
+        <option>Selecionar Colaborador</option>
+        <option>João Silva</option>
+        <option>Maria Souza</option>
+    </select>
+
+    <br><br>
+
+    <input type="month">
+
+    <br><br>
+
+    <button>Visualizar Relatório</button>
+
+    <button>Baixar Excel</button>
+
+    <button>Baixar PDF</button>
+
+    <hr>
+
+    <h2>Relatório por Núcleo</h2>
+
+    <select>
+        <option>Selecionar Núcleo</option>
+        <option>NPP</option>
+        <option>NSP</option>
+        <option>NT</option>
+    </select>
+
+    <br><br>
+
+    <input type="month">
+
+    <br><br>
+
+    <button>Gerar Relatório do Núcleo</button>
+
+</div>
+
+</body>
+</html>

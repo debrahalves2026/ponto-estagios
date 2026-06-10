@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Cadastro de Colaborador</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Cadastro de Colaborador</h1>
+
+    <form>
+
+        <input type="text" placeholder="Nome Completo">
+        <br><br>
+
+        <select>
+            <option>Selecione o Vínculo</option>
+            <option>Estagiário</option>
+            <option>Servidor</option>
+            <option>Terceirizado</option>
+            <option>Residente Jurídico</option>
+            <option>Outro</option>
+        </select>
+
+        <br><br>
+
+        <select>
+            <option>Selecione o Núcleo</option>
+            <option>Assistência de Arbitragens</option>
+            <option>CEFAP</option>
+            <option>GEAC</option>
+            <option>Núcleo Ambiental (NA)</option>
+            <option>Núcleo de Poder de Polícia (NPP)</option>
+            <option>Núcleo de Saúde Pública (NSP)</option>
+            <option>Núcleo Trabalhista (NT)</option>
+            <option>SubCG</option>
+        </select>
+
+        <br><br>
+
+        <select>
+            <option>Selecione o Turno</option>
+            <option>Manhã</option>
+            <option>Tarde</option>
+            <option>Integral</option>
+            <option>Personalizado</option>
+        </select>
+
+        <br><br>
+
+        <input type="text" placeholder="Horário">
+        <br><br>
+
+        <select>
+            <option>Modalidade de Trabalho</option>
+            <option>Presencial</option>
+            <option>Home Office</option>
+            <option>Híbrido</option>
+        </select>
+
+        <br><br>
+
+        <input type="text" placeholder="Unidade de Exercício">
+        <br><br>
+
+        <input type="text" placeholder="Procurador Monitor">
+        <br><br>
+
+        <input type="text" placeholder="Número de Celular">
+        <br><br>
+
+        <input type="text" placeholder="Login do Colaborador">
+        <br><br>
+
+        <input type="text" value="Novocolab123" readonly>
+        <br><br>
+
+        <button type="submit">
+            Cadastrar Colaborador
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+</html>

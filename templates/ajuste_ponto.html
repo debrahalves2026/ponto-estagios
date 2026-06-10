@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Solicitação de Ajuste</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Solicitação de Ajuste de Ponto</h1>
+
+    <form>
+
+        <label>Data do Ajuste</label>
+
+        <br><br>
+
+        <input type="date">
+
+        <br><br>
+
+        <label>Tipo do Ajuste</label>
+
+        <br><br>
+
+        <select>
+            <option>Entrada</option>
+            <option>Saída Intervalo</option>
+            <option>Retorno Intervalo</option>
+            <option>Saída Final</option>
+        </select>
+
+        <br><br>
+
+        <label>Horário Correto</label>
+
+        <br><br>
+
+        <input type="time">
+
+        <br><br>
+
+        <label>Justificativa</label>
+
+        <br><br>
+
+        <textarea rows="5"></textarea>
+
+        <br><br>
+
+        <button type="submit">
+            Enviar Solicitação
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+</html>

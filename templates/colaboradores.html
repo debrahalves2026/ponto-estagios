@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Colaboradores</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+
+<div class="sidebar">
+
+    <h2>Ponto Web</h2>
+
+    <ul>
+        <li><a href="/dashboard-gestor">Dashboard</a></li>
+        <li><a href="/cadastro-colaborador">Cadastrar Colaborador</a></li>
+        <li><a href="/colaboradores">Colaboradores</a></li>
+        <li><a href="#">Solicitações de Ajuste</a></li>
+        <li><a href="#">Calendário</a></li>
+        <li><a href="#">Relatórios</a></li>
+    </ul>
+
+</div>
+
+<div class="conteudo">
+
+    <h1>Colaboradores Cadastrados</h1>
+
+    <input type="text" placeholder="Pesquisar colaborador">
+
+    <br><br>
+
+    <table border="1" cellpadding="10">
+
+        <tr>
+            <th>Nome</th>
+            <th>Núcleo</th>
+            <th>Turno</th>
+            <th>Status</th>
+            <th>Ações</th>
+        </tr>
+
+        <tr>
+            <td>Exemplo Colaborador</td>
+            <td>NPP</td>
+            <td>Manhã</td>
+            <td>Ativo</td>
+            <td>
+                <button>Editar</button>
+                <button>Cancelar Cadastro</button>
+            </td>
+        </tr>
+
+    </table>
+
+</div>
+
+</body>
+</html>

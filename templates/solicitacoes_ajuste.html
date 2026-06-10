@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Solicitações de Ajuste</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+
+<body>
+
+<div class="sidebar">
+
+    <h2>Ponto Web</h2>
+
+    <ul>
+        <li><a href="/dashboard-gestor">Dashboard</a></li>
+        <li><a href="/cadastro-colaborador">Cadastrar Colaborador</a></li>
+        <li><a href="/colaboradores">Colaboradores</a></li>
+        <li><a href="/solicitacoes-ajuste">Solicitações de Ajuste</a></li>
+        <li><a href="#">Calendário</a></li>
+        <li><a href="#">Relatórios</a></li>
+    </ul>
+
+</div>
+
+<div class="conteudo">
+
+    <h1>Solicitações de Ajuste de Ponto</h1>
+
+    <table border="1" cellpadding="10">
+
+        <tr>
+            <th>Colaborador</th>
+            <th>Data</th>
+            <th>Tipo</th>
+            <th>Horário</th>
+            <th>Status</th>
+            <th>Ações</th>
+        </tr>
+
+        <tr>
+            <td>João Silva</td>
+            <td>01/06/2026</td>
+            <td>Entrada</td>
+            <td>08:00</td>
+            <td>Pendente</td>
+            <td>
+                <button>Aprovar</button>
+                <button>Reprovar</button>
+            </td>
+        </tr>
+
+    </table>
+
+</div>
+
+</body>
+</html>

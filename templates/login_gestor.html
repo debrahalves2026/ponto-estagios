@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Login Gestor</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>Área do Gestor</h1>
+
+    <form>
+
+        <select>
+            <option>Selecione o Núcleo</option>
+            <option>Núcleo de Poder de Polícia (NPP)</option>
+            <option>Núcleo de Saúde Pública (NSP)</option>
+            <option>Núcleo Trabalhista (NT)</option>
+        </select>
+
+        <br><br>
+
+        <input type="text" placeholder="Login">
+
+        <br><br>
+
+        <input type="password" placeholder="Senha">
+
+        <br><br>
+
+        <button type="submit">Entrar</button>
+
+    </form>
+
+</div>
+
+</body>
+</html>
