@@ -24,8 +24,22 @@ def login_gestor():
 
     return render_template('login_gestor.html')
 
-@app.route('/login-colaborador')
+@app.route('/login-colaborador', methods=['GET', 'POST'])
 def login_colaborador():
+
+    if request.method == 'POST':
+
+        login = request.form.get('login')
+        senha = request.form.get('senha')
+
+        if login == 'colaborador1' and senha == 'colab2026':
+            return redirect('/ponto')
+
+        return render_template(
+            'login_colaborador.html',
+            erro='Login ou senha inválidos'
+        )
+
     return render_template('login_colaborador.html')
 
 @app.route('/cadastro-colaborador')
