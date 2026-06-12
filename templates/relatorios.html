@@ -1,15 +1,6 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Relatórios</title>
+{% extends "base.html" %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-</head>
-
-<body>
-
-<div class="sidebar">
+{% block conteudo %}
 
     <h2>Ponto Web</h2>
 
@@ -67,7 +58,4 @@
 
     <button>Gerar Relatório do Núcleo</button>
 
-</div>
-
-</body>
-</html>
+{% endblock %}

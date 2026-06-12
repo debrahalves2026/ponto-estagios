@@ -40,3 +40,31 @@ body{
     margin-left:270px;
     padding:30px;
 }
+
+#toggleBtn{
+    margin:10px;
+    padding:10px;
+    cursor:pointer;
+    border:none;
+    border-radius:5px;
+}
+
+.sidebar.collapsed{
+    width:70px;
+}
+
+.sidebar.collapsed h2{
+    display:none;
+}
+
+.sidebar.collapsed ul li a{
+    font-size:0;
+}
+
+.sidebar.collapsed ul li{
+    text-align:center;
+}
+
+.sidebar.collapsed + .conteudo{
+    margin-left:90px;
+}

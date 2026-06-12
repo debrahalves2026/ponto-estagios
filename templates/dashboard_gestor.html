@@ -1,38 +1,59 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Dashboard Gestor</title>
+{% extends "base.html" %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-</head>
+{% block conteudo %}
 
-<body>
+<h1>Bem-vindo ao Sistema de Controle de Ponto</h1>
 
-<div class="sidebar">
+<h3>Gestor: gestor1</h3>
 
-    <h2>Ponto Web</h2>
+<h3>Núcleo: Núcleo de Poder de Polícia (NPP)</h3>
 
-    <ul>
-        <li><a href="#">Dashboard</a></li>
-        <li><a href="/cadastro-colaborador">Cadastrar Colaborador</a></li>
-        <li><a href="/colaboradores">Colaboradores</a></li>
-        <li><a href="/solicitacoes-ajuste">Solicitações de Ajuste</a></li>
-        <li><a href="/calendario">Calendário</a></li>
-        <li><a href="/relatorios">Relatórios</a></li>
-    </ul>
+<p id="dataAtual"></p>
 
-</div>
+<h2 id="relogio">--:--:--</h2>
 
-<div class="conteudo">
+<hr>
 
-    <h1>Bem-vindo Gestor</h1>
+<h2>Resumo do Núcleo</h2>
 
-    <p>
-        Utilize o menu lateral para acessar as funcionalidades do sistema.
-    </p>
+<hr>
 
-</div>
+<p>
+    <strong>Colaboradores cadastrados:</strong> 0
+</p>
 
-</body>
-</html>
+<p>
+    <strong>Solicitações de ajuste pendentes:</strong> 0
+</p>
+
+<p>
+    <strong>Eventos cadastrados no mês:</strong> 0
+</p>
+
+<p>
+    <strong>Último acesso:</strong> 10/06/2026
+</p>
+
+<script>
+
+function atualizarRelogio() {
+
+    const agora = new Date();
+
+    document.getElementById("relogio").innerHTML =
+        agora.toLocaleTimeString();
+
+}
+
+setInterval(atualizarRelogio, 1000);
+
+atualizarRelogio();
+
+const hoje = new Date();
+
+document.getElementById("dataAtual").innerHTML =
+    hoje.toLocaleDateString('pt-BR');
+
+</script>
+
+{% endblock %}

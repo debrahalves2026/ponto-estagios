@@ -2,33 +2,33 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ponto Eletrônico</title>
+    <title>Sistema de Ponto</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-
 <body>
 
 <div class="container">
 
-    <h1>Sistema de Ponto Eletrônico</h1>
+    <h1>Sistema de Controle de Ponto</h1>
 
-    <p>
-        Controle de frequência e acompanhamento dos colaboradores.
-    </p>
+    <p>Selecione o perfil para acesso</p>
 
-    <div class="botoes">
+    <br>
 
-        <a href="/login-gestor">
-            <button>Área do Gestor</button>
-        </a>
+    <a href="/login-gestor">
+        <button>
+            Área do Gestor
+        </button>
+    </a>
 
-        <a href="/login-colaborador">
-            <button>Área do Colaborador</button>
-        </a>
+    <br><br>
 
-    </div>
+    <a href="/login-colaborador">
+        <button>
+            Área do Colaborador
+        </button>
+    </a>
 
 </div>
 

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <title>Ponto Web</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+
+<body>
+
+<div class="sidebar" id="sidebar">
+
+    <button id="toggleBtn" onclick="toggleSidebar()">
+        ☰
+    </button>
+
+    <h2>Ponto Web</h2>
+
+    <ul>
+
+        <li><a href="/dashboard-gestor">🏠 Dashboard</a></li>
+
+        <li><a href="/cadastro-colaborador">
+            👤 Cadastrar Colaborador
+        </a></li>
+
+        <li><a href="/colaboradores">
+            👥 Colaboradores
+        </a></li>
+
+        <li><a href="/solicitacoes-ajuste">
+            📝 Solicitações de Ajuste
+        </a></li>
+
+        <li><a href="/calendario">
+            📅 Calendário
+        </a></li>
+
+        <li><a href="/relatorios">
+            📊 Relatórios
+        </a></li>
+
+        <li><a href="/">
+            🚪 Sair
+        </a></li>
+
+    </ul>
+
+</div>
+
+<div class="conteudo">
+
+    {% block conteudo %}
+    {% endblock %}
+
+</div>
+
+<script>
+
+function toggleSidebar() {
+
+    const sidebar = document.getElementById("sidebar");
+
+    sidebar.classList.toggle("collapsed");
+
+}
+
+</script>
+
+</body>
+
+</html>

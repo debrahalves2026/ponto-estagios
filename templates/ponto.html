@@ -13,7 +13,15 @@
 
     <h1>Registro de Ponto</h1>
 
-    <h3>Olá, Colaborador</h3>
+<a href="/">
+    <button type="button">
+        Sair
+    </button>
+</a>
+
+<br><br>
+
+<h3>Olá, Colaborador</h3>
 
     <p id="dataAtual"></p>
 
@@ -128,5 +136,10 @@ function registrarSaidaFinal() {
 
     document.getElementById("saidaFinal").disabled = true;
 }
+
+const hoje = new Date();
+
+document.getElementById("dataAtual").innerHTML =
+    hoje.toLocaleDateString('pt-BR');
 
 </script>

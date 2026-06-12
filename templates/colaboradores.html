@@ -1,29 +1,6 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Colaboradores</title>
+{% extends "base.html" %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-</head>
-<body>
-
-<div class="sidebar">
-
-    <h2>Ponto Web</h2>
-
-    <ul>
-        <li><a href="/dashboard-gestor">Dashboard</a></li>
-        <li><a href="/cadastro-colaborador">Cadastrar Colaborador</a></li>
-        <li><a href="/colaboradores">Colaboradores</a></li>
-        <li><a href="#">Solicitações de Ajuste</a></li>
-        <li><a href="#">Calendário</a></li>
-        <li><a href="#">Relatórios</a></li>
-    </ul>
-
-</div>
-
-<div class="conteudo">
+{% block conteudo %}
 
     <h1>Colaboradores Cadastrados</h1>
 
@@ -54,7 +31,4 @@
 
     </table>
 
-</div>
-
-</body>
-</html>
+{% endblock %}
