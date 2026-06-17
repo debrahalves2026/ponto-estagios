@@ -21,7 +21,7 @@
 
 <br><br>
 
-<h3>Olá, Colaborador</h3>
+<h3>Olá, {{ nome }}</h3>
 
     <p id="dataAtual"></p>
 
@@ -31,53 +31,47 @@
 
     <h3>Registros de Hoje</h3>
 
-    <div class="card-registro">
+<div class="card-registro">
 
-        <p id="registroEntrada">Entrada: --:--</p>
+    <p>
+        Entrada: {{ entrada }}
+    </p>
 
-        <p id="registroSaidaIntervalo">
-            Saída Intervalo: --:--
-        </p>
+    <p>
+        Saída: {{ saida_final }}
+    </p>
 
-        <p id="registroRetornoIntervalo">
-            Retorno Intervalo: --:--
-        </p>
-
-        <p id="registroSaidaFinal">
-            Saída Final: --:--
-        </p>
-
-    </div>
+</div>
 
     <br>
 
-    <button id="entrada" onclick="registrarEntrada()">
+    <a href="/registrar-entrada">
+    <button type="button">
         Entrada
     </button>
+</a>
 
     <br><br>
 
-    <button id="saidaIntervalo" disabled onclick="registrarSaidaIntervalo()">
-        Saída Intervalo
+    <a href="/registrar-saida-final">
+    <button type="button">
+        Saída
     </button>
-
-    <br><br>
-
-    <button id="retornoIntervalo" disabled onclick="registrarRetornoIntervalo()">
-        Retorno Intervalo
-    </button>
-
-    <br><br>
-
-    <button id="saidaFinal" disabled onclick="registrarSaidaFinal()">
-        Saída Final
-    </button>
+</a>
 
     <br><br>
 
 <a href="/ajuste-ponto">
     <button type="button">
         Solicitar Ajuste de Ponto
+    </button>
+</a>
+
+<br><br>
+
+<a href="/meu-relatorio">
+    <button type="button">
+        Meu Relatório de Ponto
     </button>
 </a>
 
@@ -94,48 +88,6 @@ function atualizarRelogio() {
 
 setInterval(atualizarRelogio, 1000);
 atualizarRelogio();
-
-function horaAtual() {
-    return new Date().toLocaleTimeString();
-}
-
-function registrarEntrada() {
-
-    document.getElementById("registroEntrada").innerHTML =
-        "Entrada: " + horaAtual();
-
-    document.getElementById("entrada").disabled = true;
-
-    document.getElementById("saidaIntervalo").disabled = false;
-}
-
-function registrarSaidaIntervalo() {
-
-    document.getElementById("registroSaidaIntervalo").innerHTML =
-        "Saída Intervalo: " + horaAtual();
-
-    document.getElementById("saidaIntervalo").disabled = true;
-
-    document.getElementById("retornoIntervalo").disabled = false;
-}
-
-function registrarRetornoIntervalo() {
-
-    document.getElementById("registroRetornoIntervalo").innerHTML =
-        "Retorno Intervalo: " + horaAtual();
-
-    document.getElementById("retornoIntervalo").disabled = true;
-
-    document.getElementById("saidaFinal").disabled = false;
-}
-
-function registrarSaidaFinal() {
-
-    document.getElementById("registroSaidaFinal").innerHTML =
-        "Saída Final: " + horaAtual();
-
-    document.getElementById("saidaFinal").disabled = true;
-}
 
 const hoje = new Date();
 

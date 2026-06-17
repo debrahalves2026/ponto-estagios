@@ -13,12 +13,12 @@
 
     <h1>Cadastro de Colaborador</h1>
 
-    <form>
+    <form method="POST" action="/salvar-colaborador">
 
-        <input type="text" placeholder="Nome Completo">
+        <input type="text" name="nome" placeholder="Nome Completo" required>
         <br><br>
 
-        <select>
+        <select name="vinculo">
             <option>Selecione o Vínculo</option>
             <option>Estagiário</option>
             <option>Servidor</option>
@@ -29,7 +29,7 @@
 
         <br><br>
 
-        <select>
+        <select name="nucleo">
             <option>Selecione o Núcleo</option>
             <option>Assistência de Arbitragens</option>
             <option>CEFAP</option>
@@ -43,7 +43,7 @@
 
         <br><br>
 
-        <select>
+        <select name="turno">
             <option>Selecione o Turno</option>
             <option>Manhã</option>
             <option>Tarde</option>
@@ -53,10 +53,10 @@
 
         <br><br>
 
-        <input type="text" placeholder="Horário">
+        <input type="text" name="horario" placeholder="Horário">
         <br><br>
 
-        <select>
+        <select name="presencial">
             <option>Modalidade de Trabalho</option>
             <option>Presencial</option>
             <option>Home Office</option>
@@ -65,19 +65,19 @@
 
         <br><br>
 
-        <input type="text" placeholder="Unidade de Exercício">
+        <input type="text" name="unidade_exercicio" placeholder="Unidade de Exercício">
         <br><br>
 
-        <input type="text" placeholder="Procurador Monitor">
+        <input type="text" name="procurador_monitor" placeholder="Procurador Monitor">
         <br><br>
 
-        <input type="text" placeholder="Número de Celular">
+        <input type="text" name="celular" placeholder="Número de Celular">
         <br><br>
 
-        <input type="text" placeholder="Login do Colaborador">
+        <input type="text" name="login" placeholder="Login do Colaborador">
         <br><br>
 
-        <input type="text" value="Novocolab123" readonly>
+        <input type="text" name="senha" value="Novocolab123" readonly>
         <br><br>
 
         <button type="submit">

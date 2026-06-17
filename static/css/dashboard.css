@@ -68,3 +68,17 @@ body{
 .sidebar.collapsed + .conteudo{
     margin-left:90px;
 }
+
+.btn-voltar{
+    background:#1f3c88;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:14px;
+}
+
+.btn-voltar:hover{
+    opacity:0.9;
+}

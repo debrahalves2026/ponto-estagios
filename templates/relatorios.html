@@ -2,60 +2,112 @@
 
 {% block conteudo %}
 
-    <h2>Ponto Web</h2>
+<h2>Relatório Individual</h2>
 
-    <ul>
-        <li><a href="/dashboard-gestor">Dashboard</a></li>
-        <li><a href="/cadastro-colaborador">Cadastrar Colaborador</a></li>
-        <li><a href="/colaboradores">Colaboradores</a></li>
-        <li><a href="/solicitacoes-ajuste">Solicitações de Ajuste</a></li>
-        <li><a href="/calendario">Calendário</a></li>
-        <li><a href="/relatorios">Relatórios</a></li>
-    </ul>
+<form method="POST" action="/visualizar-relatorio">
 
-</div>
+    <select name="colaborador_id" required>
 
-<div class="conteudo">
+        <option value="">
+            Selecionar Colaborador
+        </option>
 
-    <h1>Relatórios</h1>
+        {% for colaborador in colaboradores %}
 
-    <h2>Relatório Individual</h2>
+            <option value="{{ colaborador[0] }}">
+                {{ colaborador[1] }}
+            </option>
 
-    <select>
-        <option>Selecionar Colaborador</option>
-        <option>João Silva</option>
-        <option>Maria Souza</option>
+        {% endfor %}
+
     </select>
 
     <br><br>
 
-    <input type="month">
+    <input type="month" name="mes">
 
     <br><br>
 
-    <button>Visualizar Relatório</button>
+    <button type="submit">
+        Visualizar Relatório
+    </button>
 
-    <button>Baixar Excel</button>
+</form>
 
-    <button>Baixar PDF</button>
+<br>
 
-    <hr>
+<button>
+    Baixar Excel
+</button>
 
-    <h2>Relatório por Núcleo</h2>
+<button>
+    Baixar PDF
+</button>
 
-    <select>
-        <option>Selecionar Núcleo</option>
-        <option>NPP</option>
-        <option>NSP</option>
-        <option>NT</option>
-    </select>
+<hr>
 
-    <br><br>
+<h2>Relatório por Núcleo</h2>
 
-    <input type="month">
+<select>
+    <option>Selecionar Núcleo</option>
+    <option>NPP</option>
+    <option>NSP</option>
+    <option>NT</option>
+</select>
 
-    <br><br>
+<br><br>
 
-    <button>Gerar Relatório do Núcleo</button>
+<input type="month">
+
+<br><br>
+
+<button>
+    Gerar Relatório do Núcleo
+</button>
+
+<hr>
+
+<h2>Resultado</h2>
+
+{% if nome_colaborador %}
+    <h3>Relatório de {{ nome_colaborador }}</h3>
+{% endif %}
+
+<p>
+    Quantidade de registros:
+    {{ registros|length if registros else 0 }}
+</p>
+
+<table border="1" cellpadding="10">
+
+    <tr>
+        <th>Data</th>
+        <th>Entrada</th>
+        <th>Saída</th>
+    </tr>
+
+    {% if registros %}
+
+        {% for registro in registros %}
+
+        <tr>
+            <td>{{ registro[0] }}</td>
+            <td>{{ registro[1] }}</td>
+            <td>{{ registro[2] or '--:--' }}</td>
+        </tr>
+
+        {% endfor %}
+
+    {% else %}
+
+        <tr>
+            <td colspan="3">
+                Nenhum registro encontrado.
+            </td>
+        </tr>
+
+    {% endif %}
+
+</table>
 
 {% endblock %}
