@@ -693,6 +693,41 @@ def gerar_pdf():
 
     elementos.append(tabela)
 
+    elementos.append(Spacer(1, 120))
+
+    elementos.append(
+    Paragraph(
+        "<b>VISTO</b>",
+        estilos['Title']
+    )
+)
+
+    elementos.append(Spacer(1, 50))
+
+    assinaturas = Table([
+    [
+        "__________________________________",
+        "__________________________________"
+    ],
+    [
+        colaborador[0],
+        "ASSINATURA/CARIMBO"
+    ],
+    [
+        "Assinatura do Colaborador",
+        "PROCURADOR DO ESTADO"
+    ]
+], colWidths=[250, 250])
+    
+    assinaturas.setStyle(TableStyle([
+    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+    ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+]))
+
+    elementos.append(assinaturas)
+
     doc.build(elementos)
 
     return send_file(
