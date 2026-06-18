@@ -4,6 +4,10 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from openpyxl import Workbook
+from database.conexao import conectar
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import re
 
 app = Flask(__name__)
 
@@ -62,6 +66,10 @@ def login_colaborador():
 
             session['colaborador_id'] = colaborador[0]
             session['nome'] = colaborador[1]
+
+            # senha padrão = primeiro acesso
+            if colaborador[11] == "Novocolab123":
+                return redirect('/primeiro-acesso')
 
             return redirect('/ponto')
 
@@ -124,13 +132,12 @@ def ponto():
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
-    from database.conexao import conectar
-    from datetime import datetime
-
     conn = conectar()
     cursor = conn.cursor()
 
-    data_hoje = datetime.now().strftime('%d/%m/%Y')
+    data_hoje = datetime.now(
+    ZoneInfo("America/Sao_Paulo")
+).strftime('%d/%m/%Y')
 
     cursor.execute("""
         SELECT
@@ -380,8 +387,13 @@ def registrar_entrada():
     conn = conectar()
     cursor = conn.cursor()
 
-    data_hoje = datetime.now().strftime('%d/%m/%Y')
-    hora_atual = datetime.now().strftime('%H:%M:%S')
+    data_hoje = datetime.now(
+    ZoneInfo("America/Sao_Paulo")
+).strftime('%d/%m/%Y')
+    hora_atual = datetime.now(
+    ZoneInfo("America/Sao_Paulo")
+).strftime('%H:%M:%S')
+    print("HORA SERVIDOR:", datetime.now())
 
     print("ENTRADA CLICADA")
 
@@ -433,8 +445,13 @@ def registrar_saida_final():
     conn = conectar()
     cursor = conn.cursor()
 
-    data_hoje = datetime.now().strftime('%d/%m/%Y')
-    hora_atual = datetime.now().strftime('%H:%M:%S')
+    data_hoje = datetime.now(
+    ZoneInfo("America/Sao_Paulo")
+).strftime('%d/%m/%Y')
+    hora_atual = datetime.now(
+    ZoneInfo("America/Sao_Paulo")
+).strftime('%H:%M:%S')
+    print("HORA SERVIDOR:", datetime.now())
 
     print("SAÍDA CLICADA")
 
@@ -782,6 +799,66 @@ def gerar_excel():
         arquivo,
         as_attachment=True
     )
+
+@app.route('/primeiro-acesso')
+def primeiro_acesso():
+
+    if 'colaborador_id' not in session:
+        return redirect('/login-colaborador')
+
+    return render_template('primeiro_acesso.html')
+
+@app.route('/alterar-senha', methods=['POST'])
+def alterar_senha():
+
+    if 'colaborador_id' not in session:
+        return redirect('/login-colaborador')
+
+    senha1 = request.form['senha']
+    senha2 = request.form['confirmar_senha']
+
+    if senha1 != senha2:
+        return """
+        As senhas não coincidem.
+        """
+
+    if senha1 == "Novocolab123":
+        return """
+        A senha padrão não pode ser utilizada novamente.
+        """
+
+    padrao = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$'
+
+    if not re.match(padrao, senha1):
+
+        return """
+        A senha deve possuir:
+
+        - mínimo de 8 caracteres;
+        - uma letra maiúscula;
+        - uma letra minúscula;
+        - um número;
+        - um caractere especial.
+        """
+
+    from database.conexao import conectar
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE colaboradores
+        SET senha = ?
+        WHERE id = ?
+    """, (
+        senha1,
+        session['colaborador_id']
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/ponto')
 
 if __name__ == '__main__':
     app.run(debug=True)
