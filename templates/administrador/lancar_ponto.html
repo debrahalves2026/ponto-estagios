@@ -1,0 +1,80 @@
+{% extends "base_administrador.html" %}
+
+{% block conteudo %}
+
+<h1>Lançamento Manual de Ponto</h1>
+
+<form action="/salvar-lancamento-ponto" method="POST">
+
+    <label>Colaborador</label>
+
+    <br><br>
+
+    <select name="colaborador_id" required>
+
+        <option value="">Selecione o Colaborador</option>
+
+        {% for colaborador in colaboradores %}
+
+        <option value="{{ colaborador[0] }}">
+            {{ colaborador[1] }}
+        </option>
+
+        {% endfor %}
+
+    </select>
+
+    <br><br>
+
+    <label>Data</label>
+
+    <br><br>
+
+    <input
+        type="date"
+        name="data"
+        required>
+
+    <br><br>
+
+    <label>Horário de Entrada</label>
+
+    <br><br>
+
+    <input
+        type="time"
+        name="entrada"
+        required>
+
+    <br><br>
+
+    <label>Horário de Saída</label>
+
+    <br><br>
+
+    <input
+        type="time"
+        name="saida_final"
+        required>
+
+    <br><br>
+
+    <label>Observação</label>
+
+    <br><br>
+
+    <textarea
+        name="observacao"
+        rows="4"
+        cols="50"
+        placeholder="Observação (opcional)"></textarea>
+
+    <br><br>
+
+    <button type="submit">
+        Salvar Registro
+    </button>
+
+</form>
+
+{% endblock %}

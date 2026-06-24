@@ -1,0 +1,74 @@
+{% extends "base_administrador.html" %}
+
+{% block conteudo %}
+
+<h1>Bem-vindo ao Sistema de Controle de Ponto</h1>
+
+<h3>Administrador do Sistema</h3>
+
+<p id="dataAtual"></p>
+
+<h2 id="relogio">--:--:--</h2>
+
+<hr>
+
+<h2>Resumo do Sistema</h2>
+
+<hr>
+
+<p>
+    <strong>Total de colaboradores:</strong>
+    {{ total_colaboradores }}
+</p>
+
+<p>
+    <strong>Colaboradores ativos:</strong>
+    {{ colaboradores_ativos }}
+</p>
+
+<p>
+    <strong>Colaboradores inativos:</strong>
+    {{ colaboradores_inativos }}
+</p>
+
+<p>
+    <strong>Gestores cadastrados:</strong>
+    {{ total_gestores }}
+</p>
+
+<p>
+    <strong>Núcleos cadastrados:</strong>
+    {{ total_nucleos }}
+</p>
+
+<p>
+    <strong>Solicitações de ajuste pendentes:</strong>
+    {{ ajustes_pendentes }}
+</p>
+
+<p>
+    <strong>Data Atual:</strong>
+    <span id="ultimaData"></span>
+</p>
+
+<script>
+
+function atualizarRelogio() {
+
+    const agora = new Date();
+
+    document.getElementById("relogio").innerHTML =
+        agora.toLocaleTimeString('pt-BR');
+
+}
+
+setInterval(atualizarRelogio, 1000);
+
+atualizarRelogio();
+
+document.getElementById("ultimaData").innerHTML =
+    new Date().toLocaleDateString('pt-BR');
+
+</script>
+
+{% endblock %}

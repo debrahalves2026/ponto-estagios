@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Primeiro Acesso do Gestor</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Primeiro Acesso</h1>
+
+    <h3>Bem-vindo ao Sistema de Controle de Ponto</h3>
+
+    <hr>
+
+    <p>
+
+        Por motivos de segurança, é necessário alterar a senha padrão antes de continuar.
+
+    </p>
+
+    <p>
+
+        A nova senha deve possuir:
+
+    </p>
+
+    <ul>
+
+        <li>No mínimo 8 caracteres;</li>
+
+        <li>Uma letra maiúscula;</li>
+
+        <li>Uma letra minúscula;</li>
+
+        <li>Um número;</li>
+
+        <li>Um caractere especial.</li>
+
+    </ul>
+
+    <br>
+
+    <form method="POST"
+          action="/alterar-senha-gestor">
+
+        <label>Nova Senha</label>
+
+        <br>
+
+        <input
+            type="password"
+            name="senha"
+            placeholder="Digite a nova senha"
+            required>
+
+        <br><br>
+
+        <label>Confirmar Senha</label>
+
+        <br>
+
+        <input
+            type="password"
+            name="confirmar_senha"
+            placeholder="Confirme a nova senha"
+            required>
+
+        <br><br>
+
+        <button type="submit">
+
+            Salvar Senha
+
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+
+</html>

@@ -1,0 +1,85 @@
+{% extends "base_gestor_nucleo.html" %}
+
+{% block conteudo %}
+
+<h1>Calendário do Núcleo</h1>
+
+<form>
+
+    <label>Título do Evento</label>
+
+    <br><br>
+
+    <input
+        type="text"
+        placeholder="Ex.: Home Office Equipe"
+        required>
+
+    <br><br>
+
+    <label>Tipo de Evento</label>
+
+    <br><br>
+
+    <select required>
+
+        <option value="">Selecione</option>
+        <option>Home Office</option>
+        <option>Feriado</option>
+        <option>Ponto Facultativo</option>
+        <option>Reunião</option>
+        <option>Evento</option>
+
+    </select>
+
+    <br><br>
+
+    <label>Data</label>
+
+    <br><br>
+
+    <input
+        type="date"
+        required>
+
+    <br><br>
+
+    <label>Descrição</label>
+
+    <br><br>
+
+    <textarea
+        rows="4"
+        cols="50"></textarea>
+
+    <br><br>
+
+    <button type="submit">
+
+        Adicionar Evento
+
+    </button>
+
+</form>
+
+<hr>
+
+<h2>Eventos Cadastrados</h2>
+
+<table border="1" cellpadding="10">
+
+    <tr>
+        <th>Data</th>
+        <th>Tipo</th>
+        <th>Título</th>
+    </tr>
+
+    <tr>
+        <td>15/06/2026</td>
+        <td>Home Office</td>
+        <td>Equipe NPP</td>
+    </tr>
+
+</table>
+
+{% endblock %}

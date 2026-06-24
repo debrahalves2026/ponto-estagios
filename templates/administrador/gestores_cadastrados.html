@@ -1,0 +1,81 @@
+{% extends "base_administrador.html" %}
+
+{% block conteudo %}
+
+<h1>Gestores Cadastrados</h1>
+
+<br>
+
+<table border="1" cellpadding="10">
+
+    <tr>
+        <th>Nome</th>
+        <th>Núcleo</th>
+        <th>Login</th>
+        <th>Status</th>
+        <th>Ações</th>
+    </tr>
+
+    {% for gestor in gestores %}
+
+    <tr>
+
+        <td>{{ gestor[1] }}</td>
+
+        <td>{{ gestor[2] }}</td>
+
+        <td>{{ gestor[5] }}</td>
+
+        <td>
+
+            {% if gestor[7] == 'Ativo' %}
+
+                <span style="color:green;">
+                    ● Ativo
+                </span>
+
+            {% else %}
+
+                <span style="color:red;">
+                    ● Inativo
+                </span>
+
+            {% endif %}
+
+        </td>
+
+        <td>
+
+            <a href="/editar-gestor/{{ gestor[0] }}">
+                <button>
+                    Editar
+                </button>
+            </a>
+
+            <a href="/resetar-senha-gestor/{{ gestor[0] }}"
+               onclick="return confirm('Deseja resetar a senha deste gestor?');">
+
+                <button>
+                    Resetar Senha
+                </button>
+
+            </a>
+
+            <a href="/cancelar-gestor/{{ gestor[0] }}"
+               onclick="return confirm('Deseja inativar este gestor?');">
+
+                <button>
+                    Inativar
+                </button>
+
+            </a>
+
+        </td>
+
+    </tr>
+
+    {% endfor %}
+
+</table>
+
+{% endblock %}

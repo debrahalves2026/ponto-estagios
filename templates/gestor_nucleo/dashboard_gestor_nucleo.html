@@ -1,0 +1,101 @@
+{% extends "base_gestor_nucleo.html" %}
+
+{% block conteudo %}
+
+<h1>Painel do Gestor do Núcleo</h1>
+
+<h2>Bem-vindo, {{ nome }}</h2>
+
+<h3>{{ nucleo }}</h3>
+
+<hr>
+
+<h2>Resumo do Núcleo</h2>
+
+<table border="1" cellpadding="10">
+
+    <tr>
+
+        <th>Total de Colaboradores</th>
+
+        <th>Colaboradores Ativos</th>
+
+        <th>Colaboradores Inativos</th>
+
+        <th>Solicitações Pendentes</th>
+
+    </tr>
+
+    <tr>
+
+        <td>{{ total_colaboradores }}</td>
+
+        <td>{{ colaboradores_ativos }}</td>
+
+        <td>{{ colaboradores_inativos }}</td>
+
+        <td>{{ ajustes_pendentes }}</td>
+
+    </tr>
+
+</table>
+
+<hr>
+
+<h2>Indicadores do Núcleo</h2>
+
+<p>
+
+    <strong>Total de Colaboradores:</strong>
+
+    {{ total_colaboradores }}
+
+</p>
+
+<p>
+
+    <strong>Colaboradores Ativos:</strong>
+
+    {{ colaboradores_ativos }}
+
+</p>
+
+<p>
+
+    <strong>Colaboradores Inativos:</strong>
+
+    {{ colaboradores_inativos }}
+
+</p>
+
+<p>
+
+    <strong>Ajustes Pendentes:</strong>
+
+    {{ ajustes_pendentes }}
+
+</p>
+
+<hr>
+
+<h2>Situação do Núcleo</h2>
+
+{% if ajustes_pendentes == 0 %}
+
+<p style="color:green;">
+
+    ● Nenhuma solicitação pendente.
+
+</p>
+
+{% else %}
+
+<p style="color:orange;">
+
+    ● Existem {{ ajustes_pendentes }} solicitações aguardando análise.
+
+</p>
+
+{% endif %}
+
+{% endblock %}

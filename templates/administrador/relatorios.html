@@ -1,0 +1,107 @@
+{% extends "base_administrador.html" %}
+
+{% block conteudo %}
+
+<h1>Relatórios</h1>
+
+<hr>
+
+<h2>Relatório Individual</h2>
+
+<form method="POST" action="/visualizar-relatorio">
+
+    <label>Colaborador</label>
+
+    <br><br>
+
+    <select name="colaborador_id" required>
+
+        <option value="">
+            Selecionar Colaborador
+        </option>
+
+        {% for colaborador in colaboradores %}
+
+        <option value="{{ colaborador[0] }}">
+            {{ colaborador[1] }}
+        </option>
+
+        {% endfor %}
+
+    </select>
+
+    <br><br>
+
+    <label>Mês de Referência</label>
+
+    <br><br>
+
+    <input type="month" name="mes">
+
+    <br><br>
+
+    <button type="submit">
+        Visualizar Relatório
+    </button>
+
+</form>
+
+<hr>
+
+{% if nome_colaborador %}
+
+<h2>Relatório de {{ nome_colaborador }}</h2>
+
+<p>
+
+    <strong>Quantidade de registros:</strong>
+
+    {{ registros|length }}
+
+</p>
+
+<table border="1" cellpadding="10">
+
+    <tr>
+        <th>Data</th>
+        <th>Entrada</th>
+        <th>Saída</th>
+    </tr>
+
+    {% for registro in registros %}
+
+    <tr>
+
+        <td>{{ registro[0] }}</td>
+
+        <td>{{ registro[1] }}</td>
+
+        <td>{{ registro[2] or '--:--' }}</td>
+
+    </tr>
+
+    {% endfor %}
+
+</table>
+
+<br>
+
+<button>
+    Baixar Excel
+</button>
+
+<button>
+    Baixar PDF
+</button>
+
+{% else %}
+
+<p>
+
+    Nenhum relatório carregado.
+
+</p>
+
+{% endif %}
+
+{% endblock %}

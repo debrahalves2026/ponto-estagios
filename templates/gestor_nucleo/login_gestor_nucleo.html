@@ -1,48 +1,87 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Login Colaborador</title>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Login Gestor do Núcleo</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
 </head>
+
 <body>
 
 <div class="container">
 
-    <h1>Área do Colaborador</h1>
+    <h1>Área do Gestor do Núcleo</h1>
+
+    <h3>Sistema de Controle de Ponto</h3>
+
+    <hr>
 
     <form method="POST">
+
+        <label>Login</label>
+
+        <br>
 
         <input
             type="text"
             name="login"
-            placeholder="Login"
+            placeholder="Digite seu login"
             required>
 
         <br><br>
 
+        <label>Senha</label>
+
+        <br>
+
         <input
             type="password"
             name="senha"
-            placeholder="Senha"
+            placeholder="Digite sua senha"
             required>
 
         <br><br>
 
         <button type="submit">
+
             Entrar
+
         </button>
 
     </form>
 
+    <br>
+
+    <a href="/">
+
+        <button type="button">
+
+            Voltar
+
+        </button>
+
+    </a>
+
     {% if erro %}
+
+        <br><br>
+
         <p style="color:red;">
+
             {{ erro }}
+
         </p>
+
     {% endif %}
 
 </div>
 
 </body>
+
 </html>

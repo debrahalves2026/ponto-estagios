@@ -1,0 +1,118 @@
+{% extends "base_administrador.html" %}
+
+{% block conteudo %}
+
+<h1>Editar Colaborador</h1>
+
+<form method="POST"
+      action="/atualizar-colaborador/{{ colaborador[0] }}">
+
+    <label>Nome Completo</label>
+
+    <br><br>
+
+    <input
+        type="text"
+        name="nome"
+        value="{{ colaborador[1] }}"
+        required>
+
+    <br><br>
+
+    <label>Núcleo</label>
+
+    <br><br>
+
+    <select name="nucleo" required>
+
+        <option {% if colaborador[3] == 'Assistência de Arbitragens' %}selected{% endif %}>
+            Assistência de Arbitragens
+        </option>
+
+        <option {% if colaborador[3] == 'CEFAP' %}selected{% endif %}>
+            CEFAP
+        </option>
+
+        <option {% if colaborador[3] == 'GEAC' %}selected{% endif %}>
+            GEAC
+        </option>
+
+        <option {% if colaborador[3] == 'Núcleo Ambiental (NA)' %}selected{% endif %}>
+            Núcleo Ambiental (NA)
+        </option>
+
+        <option {% if colaborador[3] == 'Núcleo de Poder de Polícia (NPP)' %}selected{% endif %}>
+            Núcleo de Poder de Polícia (NPP)
+        </option>
+
+        <option {% if colaborador[3] == 'Núcleo de Saúde Pública (NSP)' %}selected{% endif %}>
+            Núcleo de Saúde Pública (NSP)
+        </option>
+
+        <option {% if colaborador[3] == 'Núcleo Trabalhista (NT)' %}selected{% endif %}>
+            Núcleo Trabalhista (NT)
+        </option>
+
+        <option {% if colaborador[3] == 'SubCG' %}selected{% endif %}>
+            SubCG
+        </option>
+
+    </select>
+
+    <br><br>
+
+    <label>Turno</label>
+
+    <br><br>
+
+    <select name="turno" required>
+
+        <option {% if colaborador[4] == 'Manhã' %}selected{% endif %}>
+            Manhã
+        </option>
+
+        <option {% if colaborador[4] == 'Tarde' %}selected{% endif %}>
+            Tarde
+        </option>
+
+        <option {% if colaborador[4] == 'Integral' %}selected{% endif %}>
+            Integral
+        </option>
+
+        <option {% if colaborador[4] == 'Personalizado' %}selected{% endif %}>
+            Personalizado
+        </option>
+
+    </select>
+
+    <br><br>
+
+    <label>Horário</label>
+
+    <br><br>
+
+    <input
+        type="text"
+        name="horario"
+        value="{{ colaborador[5] }}">
+
+    <br><br>
+
+    <label>Celular</label>
+
+    <br><br>
+
+    <input
+        type="text"
+        name="celular"
+        value="{{ colaborador[9] }}">
+
+    <br><br>
+
+    <button type="submit">
+        Salvar Alterações
+    </button>
+
+</form>
+
+{% endblock %}

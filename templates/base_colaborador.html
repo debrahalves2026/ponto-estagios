@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Ponto Web</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="sidebar">
+
+    <h2>Ponto Web</h2>
+
+    <a href="/ponto">
+        ⏰ Registro de Ponto
+    </a>
+
+    <a href="/ajuste-ponto">
+        📝 Solicitar Ajuste
+    </a>
+
+    <a href="/meus-ajustes">
+        📋 Meus Ajustes
+    </a>
+
+    <a href="/meu-relatorio">
+        📊 Meu Relatório
+    </a>
+
+    <a href="/">
+        🚪 Sair
+    </a>
+
+</div>
+
+
+<div class="conteudo">
+
+{% block conteudo %}
+{% endblock %}
+
+</div>
+
+</body>
+</html>

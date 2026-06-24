@@ -19,8 +19,13 @@ criar_tabelas()
 def inicio():
     return render_template('index.html')
 
-@app.route('/login-gestor', methods=['GET', 'POST'])
-def login_gestor():
+
+# =========================
+# ADMINISTRADOR
+# =========================
+
+@app.route('/login-administrador', methods=['GET', 'POST'])
+def login_administrador():
 
     if request.method == 'POST':
 
@@ -28,14 +33,297 @@ def login_gestor():
         senha = request.form.get('senha')
 
         if login == 'gestor1' and senha == 'gestor2026':
-            return redirect('/dashboard-gestor')
+            return redirect('/dashboard-administrador')
 
         return render_template(
-            'login_gestor.html',
+            'administrador/login_administrador.html',
             erro='Login ou senha inválidos'
         )
 
-    return render_template('login_gestor.html')
+    return render_template(
+        'administrador/login_administrador.html'
+    )
+
+
+# =========================
+# GESTOR DO NÚCLEO
+# =========================
+
+@app.route('/login-gestor-nucleo', methods=['GET', 'POST'])
+def login_gestor_nucleo():
+
+    if request.method == 'POST':
+
+        login = request.form.get('login')
+        senha = request.form.get('senha')
+
+        conn = conectar()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT *
+            FROM gestores
+            WHERE login = ?
+            AND senha = ?
+            AND status = 'Ativo'
+        """, (
+            login,
+            senha
+        ))
+
+        gestor = cursor.fetchone()
+
+        conn.close()
+
+        if gestor:
+
+            session['gestor_id'] = gestor[0]
+            session['nome_gestor'] = gestor[1]
+            session['nucleo_gestor'] = gestor[2]
+
+            # Primeiro acesso
+            if gestor[6] == "Novocolab123":
+                return redirect('/primeiro-acesso-gestor')
+
+            return redirect('/dashboard-gestor-nucleo')
+
+        return render_template(
+            'gestor_nucleo/login_gestor_nucleo.html',
+            erro='Login ou senha inválidos'
+        )
+
+    return render_template(
+        'gestor_nucleo/login_gestor_nucleo.html'
+    )
+
+
+@app.route('/dashboard-gestor-nucleo')
+def dashboard_gestor_nucleo():
+
+    if 'gestor_id' not in session:
+        return redirect('/login-gestor-nucleo')
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    # Total de colaboradores
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM colaboradores
+        WHERE nucleo = ?
+    """, (
+        session['nucleo_gestor'],
+    ))
+    total_colaboradores = cursor.fetchone()[0]
+
+    # Colaboradores ativos
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM colaboradores
+        WHERE nucleo = ?
+        AND status = 'Ativo'
+    """, (
+        session['nucleo_gestor'],
+    ))
+    colaboradores_ativos = cursor.fetchone()[0]
+
+    # Colaboradores inativos
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM colaboradores
+        WHERE nucleo = ?
+        AND status = 'Inativo'
+    """, (
+        session['nucleo_gestor'],
+    ))
+    colaboradores_inativos = cursor.fetchone()[0]
+
+    # Ajustes pendentes
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM ajustes_ponto
+        INNER JOIN colaboradores
+        ON ajustes_ponto.colaborador_id = colaboradores.id
+        WHERE colaboradores.nucleo = ?
+        AND ajustes_ponto.status = 'Pendente'
+    """, (
+        session['nucleo_gestor'],
+    ))
+    ajustes_pendentes = cursor.fetchone()[0]
+
+    conn.close()
+
+    return render_template(
+        'gestor_nucleo/dashboard_gestor_nucleo.html',
+        nome=session['nome_gestor'],
+        nucleo=session['nucleo_gestor'],
+        total_colaboradores=total_colaboradores,
+        colaboradores_ativos=colaboradores_ativos,
+        colaboradores_inativos=colaboradores_inativos,
+        ajustes_pendentes=ajustes_pendentes
+    )
+
+
+# =========================
+# CADASTRO DE GESTOR
+# =========================
+
+@app.route('/cadastro-gestor')
+def cadastro_gestor():
+
+    return render_template(
+        'administrador/cadastro_gestor.html'
+    )
+
+
+@app.route('/salvar-gestor', methods=['POST'])
+def salvar_gestor():
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO gestores (
+            nome,
+            nucleo,
+            unidade_exercicio,
+            celular,
+            login,
+            senha
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        request.form['nome'],
+        request.form['nucleo'],
+        request.form['unidade_exercicio'],
+        request.form['celular'],
+        request.form['login'],
+        "Novocolab123"
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/gestores-cadastrados')
+
+# =========================
+# GESTORES CADASTRADOS
+# =========================
+
+@app.route('/editar-gestor/<int:id>')
+def editar_gestor(id):
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM gestores
+        WHERE id = ?
+    """, (
+        id,
+    ))
+
+    gestor = cursor.fetchone()
+
+    conn.close()
+
+    return render_template(
+        'administrador/editar_gestor.html',
+        gestor=gestor
+    )
+
+
+@app.route('/atualizar-gestor/<int:id>', methods=['POST'])
+def atualizar_gestor(id):
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE gestores
+        SET
+            nome = ?,
+            nucleo = ?,
+            login = ?
+        WHERE id = ?
+    """, (
+        request.form['nome'],
+        request.form['nucleo'],
+        request.form['login'],
+        id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/gestores-cadastrados')
+
+
+@app.route('/cancelar-gestor/<int:id>')
+def cancelar_gestor(id):
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE gestores
+        SET status = 'Inativo'
+        WHERE id = ?
+    """, (
+        id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/gestores-cadastrados')
+
+@app.route('/resetar-senha-gestor/<int:id>')
+def resetar_senha_gestor(id):
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE gestores
+        SET senha = ?
+        WHERE id = ?
+    """, (
+        "Novocolab123",
+        id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/gestores-cadastrados')
+
+@app.route('/gestores-cadastrados')
+def gestores_cadastrados():
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM gestores
+        ORDER BY nome
+    """)
+
+    gestores = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'administrador/gestores_cadastrados.html',
+        gestores=gestores
+    )
+
+
+# =========================
+# COLABORADOR
+# =========================
 
 @app.route('/login-colaborador', methods=['GET', 'POST'])
 def login_colaborador():
@@ -44,8 +332,6 @@ def login_colaborador():
 
         login = request.form.get('login')
         senha = request.form.get('senha')
-
-        from database.conexao import conectar
 
         conn = conectar()
         cursor = conn.cursor()
@@ -56,7 +342,10 @@ def login_colaborador():
             WHERE login = ?
             AND senha = ?
             AND status = 'Ativo'
-        """, (login, senha))
+        """, (
+            login,
+            senha
+        ))
 
         colaborador = cursor.fetchone()
 
@@ -67,64 +356,145 @@ def login_colaborador():
             session['colaborador_id'] = colaborador[0]
             session['nome'] = colaborador[1]
 
-            # senha padrão = primeiro acesso
             if colaborador[11] == "Novocolab123":
                 return redirect('/primeiro-acesso')
 
             return redirect('/ponto')
 
         return render_template(
-            'login_colaborador.html',
+            'colaborador/login_colaborador.html',
             erro='Login ou senha inválidos'
         )
 
-    return render_template('login_colaborador.html')
+    return render_template(
+        'colaborador/login_colaborador.html'
+    )
+
+
+# =========================
+# CADASTRO DE COLABORADOR
+# =========================
 
 @app.route('/cadastro-colaborador')
 def cadastro_colaborador():
-    return render_template('cadastro_colaborador.html')
 
-@app.route('/dashboard-gestor')
-def dashboard_gestor():
+    return render_template(
+        'administrador/cadastro_colaborador.html'
+    )
 
-    from database.conexao import conectar
+
+# =========================
+# DASHBOARD ADMINISTRADOR
+# =========================
+
+@app.route('/dashboard-administrador')
+def dashboard_administrador():
 
     conn = conectar()
     cursor = conn.cursor()
 
+    # Total de colaboradores
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM colaboradores
+    """)
+    total_colaboradores = cursor.fetchone()[0]
+
+    # Colaboradores ativos
     cursor.execute("""
         SELECT COUNT(*)
         FROM colaboradores
         WHERE status = 'Ativo'
     """)
+    colaboradores_ativos = cursor.fetchone()[0]
 
-    total_colaboradores = cursor.fetchone()[0]
+    # Colaboradores inativos
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM colaboradores
+        WHERE status = 'Inativo'
+    """)
+    colaboradores_inativos = cursor.fetchone()[0]
+
+    # Total de gestores
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM gestores
+        WHERE status = 'Ativo'
+    """)
+    total_gestores = cursor.fetchone()[0]
+
+    # Total de núcleos
+    cursor.execute("""
+        SELECT COUNT(DISTINCT nucleo)
+        FROM colaboradores
+    """)
+    total_nucleos = cursor.fetchone()[0]
+
+    # Ajustes pendentes
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM ajustes_ponto
+        WHERE status = 'Pendente'
+    """)
+    ajustes_pendentes = cursor.fetchone()[0]
 
     conn.close()
 
     return render_template(
-        'dashboard_gestor.html',
-        total_colaboradores=total_colaboradores
+        'administrador/dashboard_administrador.html',
+        total_colaboradores=total_colaboradores,
+        colaboradores_ativos=colaboradores_ativos,
+        colaboradores_inativos=colaboradores_inativos,
+        total_gestores=total_gestores,
+        total_nucleos=total_nucleos,
+        ajustes_pendentes=ajustes_pendentes
     )
 
-@app.route('/colaboradores')
-def colaboradores():
+# =========================
+# COLABORADORES CADASTRADOS
+# =========================
 
-    from database.conexao import conectar
+@app.route('/colaboradores-cadastrados')
+def colaboradores_cadastrados():
 
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM colaboradores")
+    # Administrador vê todos os colaboradores
+    if 'gestor_id' not in session:
+
+        cursor.execute("""
+            SELECT *
+            FROM colaboradores
+            ORDER BY nome
+        """)
+
+    # Gestor do Núcleo vê somente os colaboradores do seu núcleo
+    else:
+
+        cursor.execute("""
+            SELECT *
+            FROM colaboradores
+            WHERE nucleo = ?
+            ORDER BY nome
+        """, (
+            session['nucleo_gestor'],
+        ))
 
     colaboradores = cursor.fetchall()
 
     conn.close()
 
     return render_template(
-        'colaboradores.html',
+        'administrador/colaboradores.html',
         colaboradores=colaboradores
     )
+
+
+# =========================
+# PONTO
+# =========================
 
 @app.route('/ponto')
 def ponto():
@@ -136,8 +506,8 @@ def ponto():
     cursor = conn.cursor()
 
     data_hoje = datetime.now(
-    ZoneInfo("America/Sao_Paulo")
-).strftime('%d/%m/%Y')
+        ZoneInfo("America/Sao_Paulo")
+    ).strftime('%d/%m/%Y')
 
     cursor.execute("""
         SELECT
@@ -153,8 +523,6 @@ def ponto():
 
     registro = cursor.fetchone()
 
-    print("REGISTRO ENCONTRADO:", registro)
-
     conn.close()
 
     entrada = "--:--"
@@ -165,106 +533,371 @@ def ponto():
         saida_final = registro[1] or "--:--"
 
     return render_template(
-        'ponto.html',
+        'colaborador/ponto.html',
         nome=session['nome'],
         entrada=entrada,
         saida_final=saida_final
     )
 
+
+# =========================
+# AJUSTE DE PONTO
+# =========================
+
 @app.route('/ajuste-ponto')
 def ajuste_ponto():
-    return render_template('ajuste_ponto.html')
+
+    return render_template(
+        'colaborador/ajuste_ponto.html'
+    )
+
+
+# =========================
+# SOLICITAÇÕES DE AJUSTE
+# =========================
 
 @app.route('/solicitacoes-ajuste')
 def solicitacoes_ajuste():
-    return render_template('solicitacoes_ajuste.html')
 
-@app.route('/calendario')
-def calendario():
-    return render_template('calendario.html')
+    conn = conectar()
+    cursor = conn.cursor()
 
-@app.route('/relatorios')
-def relatorios():
+    # Administrador vê todos
+    if 'gestor_id' not in session:
 
-    from database.conexao import conectar
+        cursor.execute("""
+            SELECT
+                ajustes_ponto.id,
+                colaboradores.nome,
+                colaboradores.nucleo,
+                ajustes_ponto.data,
+                ajustes_ponto.motivo,
+                ajustes_ponto.status
+            FROM ajustes_ponto
+            INNER JOIN colaboradores
+            ON ajustes_ponto.colaborador_id = colaboradores.id
+            ORDER BY ajustes_ponto.id DESC
+        """)
+
+    # Gestor do Núcleo vê apenas os ajustes do seu núcleo
+    else:
+
+        cursor.execute("""
+            SELECT
+                ajustes_ponto.id,
+                colaboradores.nome,
+                colaboradores.nucleo,
+                ajustes_ponto.data,
+                ajustes_ponto.motivo,
+                ajustes_ponto.status
+            FROM ajustes_ponto
+            INNER JOIN colaboradores
+            ON ajustes_ponto.colaborador_id = colaboradores.id
+            WHERE colaboradores.nucleo = ?
+            ORDER BY ajustes_ponto.id DESC
+        """, (
+            session['nucleo_gestor'],
+        ))
+
+    ajustes = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'administrador/solicitacoes_ajuste.html',
+        ajustes=ajustes
+    )
+
+# =========================
+# APROVAR AJUSTE
+# =========================
+
+@app.route('/aprovar-ajuste/<int:id>')
+def aprovar_ajuste(id):
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    # Segurança para Gestor do Núcleo
+    if 'gestor_id' in session:
+
+        cursor.execute("""
+            SELECT ajustes_ponto.id
+            FROM ajustes_ponto
+            INNER JOIN colaboradores
+            ON ajustes_ponto.colaborador_id = colaboradores.id
+            WHERE ajustes_ponto.id = ?
+            AND colaboradores.nucleo = ?
+        """, (
+            id,
+            session['nucleo_gestor']
+        ))
+
+        permissao = cursor.fetchone()
+
+        if not permissao:
+            conn.close()
+            return redirect('/solicitacoes-ajuste')
+
+    cursor.execute("""
+        UPDATE ajustes_ponto
+        SET status = 'Aprovado'
+        WHERE id = ?
+    """, (id,))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/solicitacoes-ajuste')
+
+
+# =========================
+# REPROVAR AJUSTE
+# =========================
+
+@app.route('/reprovar-ajuste/<int:id>')
+def reprovar_ajuste(id):
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    # Segurança para Gestor do Núcleo
+    if 'gestor_id' in session:
+
+        cursor.execute("""
+            SELECT ajustes_ponto.id
+            FROM ajustes_ponto
+            INNER JOIN colaboradores
+            ON ajustes_ponto.colaborador_id = colaboradores.id
+            WHERE ajustes_ponto.id = ?
+            AND colaboradores.nucleo = ?
+        """, (
+            id,
+            session['nucleo_gestor']
+        ))
+
+        permissao = cursor.fetchone()
+
+        if not permissao:
+            conn.close()
+            return redirect('/solicitacoes-ajuste')
+
+    cursor.execute("""
+        UPDATE ajustes_ponto
+        SET status = 'Reprovado'
+        WHERE id = ?
+    """, (id,))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/solicitacoes-ajuste')
+
+
+# =========================
+# MEUS AJUSTES
+# =========================
+
+@app.route('/meus-ajustes')
+def meus_ajustes():
+
+    if 'colaborador_id' not in session:
+        return redirect('/login-colaborador')
 
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id, nome
-        FROM colaboradores
-        WHERE status = 'Ativo'
-        ORDER BY nome
-    """)
+        SELECT
+            data,
+            motivo,
+            status
+        FROM ajustes_ponto
+        WHERE colaborador_id = ?
+        ORDER BY id DESC
+    """, (
+        session['colaborador_id'],
+    ))
+
+    ajustes = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'colaborador/meus_ajustes.html',
+        ajustes=ajustes
+    )
+
+
+# =========================
+# CALENDÁRIO
+# =========================
+
+@app.route('/calendario')
+def calendario():
+
+    return render_template(
+        'administrador/calendario.html'
+    )
+
+
+# =========================
+# RELATÓRIOS
+# =========================
+
+@app.route('/relatorios')
+def relatorios():
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    # Administrador vê todos
+    if 'gestor_id' not in session:
+
+        cursor.execute("""
+            SELECT id, nome
+            FROM colaboradores
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)
+
+    # Gestor do Núcleo vê apenas o seu núcleo
+    else:
+
+        cursor.execute("""
+            SELECT id, nome
+            FROM colaboradores
+            WHERE status = 'Ativo'
+            AND nucleo = ?
+            ORDER BY nome
+        """, (
+            session['nucleo_gestor'],
+        ))
 
     colaboradores = cursor.fetchall()
 
     conn.close()
 
     return render_template(
-        'relatorios.html',
+        'administrador/relatorios.html',
         colaboradores=colaboradores,
         registros=None
     )
 
+
+# =========================
+# VISUALIZAR RELATÓRIO
+# =========================
+
 @app.route('/visualizar-relatorio', methods=['POST'])
 def visualizar_relatorio():
-
-    from database.conexao import conectar
 
     colaborador_id = request.form['colaborador_id']
 
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT id, nome
-        FROM colaboradores
-        WHERE status = 'Ativo'
-        ORDER BY nome
-    """)
+    # Lista de colaboradores
+    if 'gestor_id' not in session:
+
+        cursor.execute("""
+            SELECT id, nome
+            FROM colaboradores
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)
+
+    else:
+
+        cursor.execute("""
+            SELECT id, nome
+            FROM colaboradores
+            WHERE status = 'Ativo'
+            AND nucleo = ?
+            ORDER BY nome
+        """, (
+            session['nucleo_gestor'],
+        ))
 
     colaboradores = cursor.fetchall()
 
+    # Segurança adicional para Gestor do Núcleo
+    if 'gestor_id' in session:
+
+        cursor.execute("""
+            SELECT id
+            FROM colaboradores
+            WHERE id = ?
+            AND nucleo = ?
+        """, (
+            colaborador_id,
+            session['nucleo_gestor']
+        ))
+
+        permissao = cursor.fetchone()
+
+        if not permissao:
+
+            conn.close()
+
+            return render_template(
+                'administrador/relatorios.html',
+                colaboradores=colaboradores,
+                registros=None,
+                erro='Você não possui permissão para visualizar este colaborador.'
+            )
+
+    # Busca os registros
     cursor.execute("""
-    SELECT
-        data,
-        entrada,
-        saida_final
-    FROM registros_ponto
-    WHERE colaborador_id = ?
-    ORDER BY id DESC
-    """, (colaborador_id,))
+        SELECT
+            data,
+            entrada,
+            saida_final
+        FROM registros_ponto
+        WHERE colaborador_id = ?
+        ORDER BY id DESC
+    """, (
+        colaborador_id,
+    ))
 
     registros = cursor.fetchall()
 
-    print("REGISTROS:", registros)
-
     cursor.execute("""
-    SELECT nome
-    FROM colaboradores
-    WHERE id = ?
-    """, (colaborador_id,))
+        SELECT nome
+        FROM colaboradores
+        WHERE id = ?
+    """, (
+        colaborador_id,
+    ))
 
     nome_colaborador = cursor.fetchone()[0]
 
     conn.close()
 
     return render_template(
-        'relatorios.html',
+        'administrador/relatorios.html',
         colaboradores=colaboradores,
         registros=registros,
         nome_colaborador=nome_colaborador
     )
 
+# =========================
+# SALVAR COLABORADOR
+# =========================
+
 @app.route('/salvar-colaborador', methods=['POST'])
 def salvar_colaborador():
 
-    from database.conexao import conectar
-
     conn = conectar()
     cursor = conn.cursor()
+
+    # Se for Gestor do Núcleo, usa automaticamente o núcleo dele
+    if 'gestor_id' in session:
+        nucleo = session['nucleo_gestor']
+
+    # Se for Administrador, permite escolher o núcleo
+    else:
+        nucleo = request.form['nucleo']
 
     cursor.execute("""
         INSERT INTO colaboradores (
@@ -284,7 +917,7 @@ def salvar_colaborador():
     """, (
         request.form['nome'],
         request.form['vinculo'],
-        request.form['nucleo'],
+        nucleo,
         request.form['turno'],
         request.form['horario'],
         request.form['presencial'],
@@ -298,12 +931,15 @@ def salvar_colaborador():
     conn.commit()
     conn.close()
 
-    return redirect('/colaboradores')
+    return redirect('/colaboradores-cadastrados')
+
+
+# =========================
+# CANCELAR COLABORADOR
+# =========================
 
 @app.route('/cancelar-colaborador/<int:id>')
 def cancelar_colaborador(id):
-
-    from database.conexao import conectar
 
     conn = conectar()
     cursor = conn.cursor()
@@ -312,39 +948,50 @@ def cancelar_colaborador(id):
         UPDATE colaboradores
         SET status = 'Inativo'
         WHERE id = ?
-    """, (id,))
+    """, (
+        id,
+    ))
 
     conn.commit()
     conn.close()
 
-    return redirect('/colaboradores')
+    return redirect('/colaboradores-cadastrados')
+
+
+# =========================
+# EDITAR COLABORADOR
+# =========================
 
 @app.route('/editar-colaborador/<int:id>')
 def editar_colaborador(id):
 
-    from database.conexao import conectar
-
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT * FROM colaboradores WHERE id = ?",
-        (id,)
-    )
+    cursor.execute("""
+        SELECT *
+        FROM colaboradores
+        WHERE id = ?
+    """, (
+        id,
+    ))
 
     colaborador = cursor.fetchone()
 
     conn.close()
 
     return render_template(
-        'editar_colaborador.html',
+        'administrador/editar_colaborador.html',
         colaborador=colaborador
     )
 
+
+# =========================
+# ATUALIZAR COLABORADOR
+# =========================
+
 @app.route('/atualizar-colaborador/<int:id>', methods=['POST'])
 def atualizar_colaborador(id):
-
-    from database.conexao import conectar
 
     conn = conectar()
     cursor = conn.cursor()
@@ -370,32 +1017,23 @@ def atualizar_colaborador(id):
     conn.commit()
     conn.close()
 
-    return redirect('/colaboradores')
+    return redirect('/colaboradores-cadastrados')
 
-from datetime import datetime
 
-@app.route('/registrar-entrada')
+# =========================
+# REGISTRAR ENTRADA
+# =========================
+
+@app.route('/registrar-entrada', methods=['POST'])
 def registrar_entrada():
-
-    print("BOTÃO ENTRADA CLICADO")
 
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
-    from database.conexao import conectar
-
     conn = conectar()
     cursor = conn.cursor()
 
-    data_hoje = datetime.now(
-    ZoneInfo("America/Sao_Paulo")
-).strftime('%d/%m/%Y')
-    hora_atual = datetime.now(
-    ZoneInfo("America/Sao_Paulo")
-).strftime('%H:%M:%S')
-    print("HORA SERVIDOR:", datetime.now())
-
-    print("ENTRADA CLICADA")
+    hora_atual = request.form['entrada']
 
     cursor.execute("""
         SELECT id
@@ -426,34 +1064,25 @@ def registrar_entrada():
 
         conn.commit()
 
-    else:
-        print("Registro já existe para hoje")
-
     conn.close()
 
     return redirect('/ponto')
 
-@app.route('/registrar-saida-final')
+
+# =========================
+# REGISTRAR SAÍDA FINAL
+# =========================
+
+@app.route('/registrar-saida-final', methods=['POST'])
 def registrar_saida_final():
 
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
-    from database.conexao import conectar
-    from datetime import datetime
-
     conn = conectar()
     cursor = conn.cursor()
 
-    data_hoje = datetime.now(
-    ZoneInfo("America/Sao_Paulo")
-).strftime('%d/%m/%Y')
-    hora_atual = datetime.now(
-    ZoneInfo("America/Sao_Paulo")
-).strftime('%H:%M:%S')
-    print("HORA SERVIDOR:", datetime.now())
-
-    print("SAÍDA CLICADA")
+    hora_atual = request.form['saida_final']
 
     cursor.execute("""
         UPDATE registros_ponto
@@ -524,7 +1153,7 @@ def meu_relatorio():
     conn.close()
 
     return render_template(
-        'meu_relatorio.html',
+        'colaborador/meu_relatorio.html',
         registros=registros,
         nome=session['nome'],
         mes_selecionado=mes_selecionado
@@ -841,7 +1470,9 @@ def primeiro_acesso():
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
-    return render_template('primeiro_acesso.html')
+    return render_template(
+    'colaborador/primeiro_acesso.html'
+)
 
 @app.route('/alterar-senha', methods=['POST'])
 def alterar_senha():
@@ -894,6 +1525,153 @@ def alterar_senha():
     conn.close()
 
     return redirect('/ponto')
+
+@app.route('/lancar-ponto')
+def lancar_ponto():
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, nome
+        FROM colaboradores
+        WHERE status = 'Ativo'
+        ORDER BY nome
+    """)
+
+    colaboradores = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'administrador/lancar_ponto.html',
+        colaboradores=colaboradores
+    )
+
+@app.route('/salvar-lancamento-ponto', methods=['POST'])
+def salvar_lancamento_ponto():
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
+    colaborador_id = request.form['colaborador_id']
+    data = request.form['data']
+    entrada = request.form['entrada']
+    saida_final = request.form['saida_final']
+    observacao = request.form['observacao']
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO registros_ponto (
+            colaborador_id,
+            data,
+            entrada,
+            saida_final,
+            observacao
+        )
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        colaborador_id,
+        data,
+        entrada,
+        saida_final,
+        observacao
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/lancar-ponto')
+
+@app.route('/enviar-ajuste', methods=['POST'])
+def enviar_ajuste():
+
+    if 'colaborador_id' not in session:
+        return redirect('/login-colaborador')
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO ajustes_ponto (
+            colaborador_id,
+            data,
+            motivo,
+            status
+        )
+        VALUES (?, ?, ?, ?)
+    """, (
+        session['colaborador_id'],
+        request.form['data'],
+        request.form['motivo'],
+        'Pendente'
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/meus-ajustes')
+
+@app.route('/primeiro-acesso-gestor')
+def primeiro_acesso_gestor():
+
+    if 'gestor_id' not in session:
+        return redirect('/login-gestor-nucleo')
+
+    return render_template(
+        'gestor_nucleo/primeiro_acesso_gestor.html'
+    )
+
+@app.route('/alterar-senha-gestor', methods=['POST'])
+def alterar_senha_gestor():
+
+    if 'gestor_id' not in session:
+        return redirect('/login-gestor-nucleo')
+
+    senha1 = request.form['senha']
+    senha2 = request.form['confirmar_senha']
+
+    if senha1 != senha2:
+        return "As senhas não coincidem."
+
+    if senha1 == "Novocolab123":
+        return "A senha padrão não pode ser utilizada novamente."
+
+    padrao = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$'
+
+    if not re.match(padrao, senha1):
+
+        return """
+        A senha deve possuir:
+
+        - mínimo de 8 caracteres;
+        - uma letra maiúscula;
+        - uma letra minúscula;
+        - um número;
+        - um caractere especial.
+        """
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE gestores
+        SET senha = ?
+        WHERE id = ?
+    """, (
+        senha1,
+        session['gestor_id']
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/dashboard-gestor-nucleo')
 
 if __name__ == '__main__':
     app.run(debug=True)

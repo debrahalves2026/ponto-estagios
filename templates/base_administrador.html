@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Ponto Web</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+<body>
+
+<div class="sidebar">
+
+    <h1>Ponto Web</h1>
+
+    <a href="/dashboard-administrador">
+        🏠 Dashboard
+    </a>
+
+    <a href="/cadastro-colaborador">
+        👥 Cadastrar Colaborador
+    </a>
+
+    <a href="/cadastro-gestor">
+        📋 Cadastrar Gestor
+    </a>
+
+    <a href="/colaboradores-cadastrados">
+        👨🏻‍💼 Colaboradores
+    </a>
+
+    <a href="/gestores-cadastrados">
+        👔 Gestores
+    </a>
+
+    <a href="/lancar-ponto">
+        ⏰ Lançar Ponto
+    </a>
+
+    <a href="/">
+        🚪 Sair
+    </a>
+
+</div>
+
+
+<div class="conteudo">
+
+    {% block conteudo %}
+    {% endblock %}
+
+</div>
+
+</body>
+</html>

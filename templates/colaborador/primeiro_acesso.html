@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Primeiro Acesso</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Primeiro Acesso</h1>
+
+    <hr>
+
+    <p>
+
+        Bem-vindo ao Sistema de Controle de Ponto.
+
+    </p>
+
+    <p>
+
+        Por motivos de segurança, é necessário alterar a senha padrão antes de continuar.
+
+    </p>
+
+    <hr>
+
+    <h3>Requisitos da Nova Senha</h3>
+
+    <ul>
+
+        <li>Mínimo de 8 caracteres;</li>
+
+        <li>Uma letra maiúscula;</li>
+
+        <li>Uma letra minúscula;</li>
+
+        <li>Um número;</li>
+
+        <li>Um caractere especial.</li>
+
+    </ul>
+
+    <br>
+
+    <form method="POST" action="/alterar-senha">
+
+        <input
+            type="password"
+            name="senha"
+            placeholder="Nova senha"
+            required>
+
+        <br><br>
+
+        <input
+            type="password"
+            name="confirmar_senha"
+            placeholder="Confirmar nova senha"
+            required>
+
+        <br><br>
+
+        <button type="submit">
+
+            Salvar Senha
+
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+
+</html>

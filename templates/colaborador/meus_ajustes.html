@@ -1,0 +1,93 @@
+{% extends "base_colaborador.html" %}
+
+{% block conteudo %}
+
+<h1>Minhas Solicitações de Ajuste</h1>
+
+<hr>
+
+<table border="1" cellpadding="10">
+
+    <tr>
+        <th>Data</th>
+        <th>Motivo</th>
+        <th>Status</th>
+    </tr>
+
+    {% if ajustes %}
+
+        {% for ajuste in ajustes %}
+
+        <tr>
+
+            <td>{{ ajuste[0] }}</td>
+
+            <td>{{ ajuste[1] }}</td>
+
+            <td>
+
+                {% if ajuste[2] == 'Pendente' %}
+
+                    <span style="color:orange;">
+                        ● Pendente
+                    </span>
+
+                {% elif ajuste[2] == 'Aprovado' %}
+
+                    <span style="color:green;">
+                        ● Aprovado
+                    </span>
+
+                {% else %}
+
+                    <span style="color:red;">
+                        ● Reprovado
+                    </span>
+
+                {% endif %}
+
+            </td>
+
+        </tr>
+
+        {% endfor %}
+
+    {% else %}
+
+        <tr>
+
+            <td colspan="3">
+
+                Nenhuma solicitação encontrada.
+
+            </td>
+
+        </tr>
+
+    {% endif %}
+
+</table>
+
+<br><br>
+
+<a href="/ajuste-ponto">
+
+    <button type="button">
+
+        Nova Solicitação
+
+    </button>
+
+</a>
+
+<a href="/ponto">
+
+    <button type="button">
+
+        Voltar
+
+    </button>
+
+</a>
+
+{% endblock %}

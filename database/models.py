@@ -25,6 +25,19 @@ def criar_tabelas():
     """)
 
     cursor.execute("""
+    CREATE TABLE IF NOT EXISTS gestores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        nucleo TEXT,
+        unidade_exercicio TEXT,
+        celular TEXT,
+        login TEXT UNIQUE,
+        senha TEXT,
+        status TEXT DEFAULT 'Ativo'
+    )
+    """)
+
+    cursor.execute("""
     CREATE TABLE IF NOT EXISTS registros_ponto (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         colaborador_id INTEGER,
