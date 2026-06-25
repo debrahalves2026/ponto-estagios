@@ -20,7 +20,8 @@ def criar_tabelas():
         celular TEXT,
         login TEXT,
         senha TEXT,
-        status TEXT DEFAULT 'Ativo'
+        status TEXT DEFAULT 'Ativo',
+        cancel_observacao TEXT
     )
     """)
 
@@ -33,7 +34,8 @@ def criar_tabelas():
         celular TEXT,
         login TEXT UNIQUE,
         senha TEXT,
-        status TEXT DEFAULT 'Ativo'
+        status TEXT DEFAULT 'Ativo',
+        cancel_observacao TEXT
     )
     """)
 
@@ -68,6 +70,16 @@ def criar_tabelas():
         nucleo TEXT
     )
     """)
+
+    cursor.execute("PRAGMA table_info(colaboradores)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'cancel_observacao' not in columns:
+        cursor.execute("ALTER TABLE colaboradores ADD COLUMN cancel_observacao TEXT")
+
+    cursor.execute("PRAGMA table_info(gestores)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'cancel_observacao' not in columns:
+        cursor.execute("ALTER TABLE gestores ADD COLUMN cancel_observacao TEXT")
 
     conn.commit()
 

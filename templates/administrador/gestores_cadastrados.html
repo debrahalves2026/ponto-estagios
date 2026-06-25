@@ -4,15 +4,32 @@
 
 <h1>Gestores Cadastrados</h1>
 
+<style>
+    .gestores-table button {
+        display: block;
+        width: 150px;
+        margin: 4px 0;
+    }
+    .gestores-table a,
+    .gestores-table form {
+        display: inline-block;
+        vertical-align: top;
+    }
+    .gestores-table .cancel-gestor-form {
+        max-width: 100%;
+    }
+</style>
+
 <br>
 
-<table border="1" cellpadding="10">
+<table class="gestores-table" border="1" cellpadding="10">
 
     <tr>
         <th>Nome</th>
         <th>Núcleo</th>
         <th>Login</th>
         <th>Status</th>
+        <th>Motivo de cancelamento</th>
         <th>Ações</th>
     </tr>
 
@@ -44,6 +61,8 @@
 
         </td>
 
+        <td>{{ gestor[8] or '—' }}</td>
+
         <td>
 
             <a href="/editar-gestor/{{ gestor[0] }}">
@@ -61,14 +80,31 @@
 
             </a>
 
-            <a href="/cancelar-gestor/{{ gestor[0] }}"
-               onclick="return confirm('Deseja inativar este gestor?');">
+            {% if gestor[7] == 'Ativo' %}
 
-                <button>
+            <form method="POST" action="/cancelar-gestor/{{ gestor[0] }}" class="cancel-gestor-form" style="display:inline-block; vertical-align: top; max-width: 100%;">
+                <button type="button" class="show-cancel-motivo" data-gestor-id="{{ gestor[0] }}" style="margin-top:4px;">
                     Inativar
                 </button>
 
-            </a>
+                <div class="cancel-motivo-container" id="cancel-motivo-{{ gestor[0] }}" style="display:none; margin-top:8px;">
+                    <div style="margin-top:8px; margin-bottom:6px;">
+                        <label for="motivo-{{ gestor[0] }}" style="display:block; font-size:0.9rem; margin-bottom:4px;">Motivo do cancelamento</label>
+                        <textarea name="motivo_cancelamento" id="motivo-{{ gestor[0] }}" rows="2" style="width:100%; max-width:260px; padding:8px; font-size:0.9rem;"></textarea>
+                    </div>
+                    <button type="submit" onclick="return confirm('Deseja inativar este gestor?');" style="margin-top:4px;">
+                        Confirmar Inativação
+                    </button>
+                </div>
+            </form>
+
+            {% else %}
+
+            <form method="POST" action="/recadastrar-gestor/{{ gestor[0] }}" style="display:inline;">
+                <button type="submit">Recadastro</button>
+            </form>
+
+            {% endif %}
 
         </td>
 
@@ -77,5 +113,17 @@
     {% endfor %}
 
 </table>
+
+<script>
+    document.querySelectorAll('.show-cancel-motivo').forEach(button => {
+        button.addEventListener('click', () => {
+            const gestorId = button.dataset.gestorId;
+            const container = document.getElementById(`cancel-motivo-${gestorId}`);
+            if (container) {
+                container.style.display = container.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    });
+</script>
 
 {% endblock %}

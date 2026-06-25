@@ -4,19 +4,40 @@
 
 <h1>Colaboradores Cadastrados</h1>
 
+<style>
+    .colaboradores-table button {
+        display: block;
+        width: 150px;
+        margin: 4px 0;
+    }
+    .colaboradores-table a,
+    .colaboradores-table form {
+        display: inline-block;
+        vertical-align: top;
+    }
+    .colaboradores-table .cancel-colaborador-form {
+        max-width: 100%;
+    }
+    .colaboradores-table .cancel-motivo-container {
+        display: none;
+        margin-top: 8px;
+    }
+</style>
+
 <input
     type="text"
     placeholder="Pesquisar colaborador">
 
 <br><br>
 
-<table border="1" cellpadding="10">
+<table class="colaboradores-table" border="1" cellpadding="10">
 
     <tr>
         <th>Nome</th>
         <th>Núcleo</th>
         <th>Turno</th>
         <th>Status</th>
+        <th>Motivo de cancelamento</th>
         <th>Ações</th>
     </tr>
 
@@ -48,6 +69,8 @@
 
         </td>
 
+        <td>{{ colaborador[13] or '—' }}</td>
+
         <td>
 
             <a href="/editar-colaborador/{{ colaborador[0] }}">
@@ -63,14 +86,31 @@
 
             </a>
 
-            <a href="/cancelar-colaborador/{{ colaborador[0] }}"
-               onclick="return confirm('Tem certeza que deseja cancelar o cadastro de {{ colaborador[1] }}?');">
+            {% if colaborador[12] == 'Ativo' %}
 
-                <button>
-                    Cancelar Cadastro
+            <form method="POST" action="/cancelar-colaborador/{{ colaborador[0] }}" class="cancel-colaborador-form">
+                <button type="button" class="show-cancel-motivo" data-colaborador-id="{{ colaborador[0] }}" style="margin-top:4px;">
+                    Inativar
                 </button>
 
-            </a>
+                <div class="cancel-motivo-container" id="cancel-motivo-{{ colaborador[0] }}">
+                    <div style="margin-top:8px; margin-bottom:6px;">
+                        <label for="motivo-{{ colaborador[0] }}" style="display:block; font-size:0.9rem; margin-bottom:4px;">Motivo do cancelamento</label>
+                        <textarea name="motivo_cancelamento" id="motivo-{{ colaborador[0] }}" rows="2" style="width:100%; max-width:260px; padding:8px; font-size:0.9rem;" required></textarea>
+                    </div>
+                    <button type="submit" onclick="return confirm('Deseja inativar este colaborador?');" style="margin-top:4px;">
+                        Confirmar Inativação
+                    </button>
+                </div>
+            </form>
+
+            {% else %}
+
+            <form method="POST" action="/recadastrar-colaborador/{{ colaborador[0] }}" style="display:inline;">
+                <button type="submit">Recadastro</button>
+            </form>
+
+            {% endif %}
 
         </td>
 
@@ -79,5 +119,17 @@
     {% endfor %}
 
 </table>
+
+<script>
+    document.querySelectorAll('.show-cancel-motivo').forEach(button => {
+        button.addEventListener('click', () => {
+            const colaboradorId = button.dataset.colaboradorId;
+            const container = document.getElementById(`cancel-motivo-${colaboradorId}`);
+            if (container) {
+                container.style.display = container.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    });
+</script>
 
 {% endblock %}

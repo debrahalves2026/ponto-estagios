@@ -1,0 +1,52 @@
+{% extends "base_gestor_nucleo.html" %}
+
+{% block conteudo %}
+
+<h1>Solicitações de Ajuste de Ponto</h1>
+
+<hr>
+
+<table border="1" cellpadding="10">
+
+    <tr>
+        <th>Colaborador</th>
+        <th>Núcleo</th>
+        <th>Data</th>
+        <th>Motivo</th>
+        <th>Status</th>
+        <th>Ações</th>
+    </tr>
+
+    {% for ajuste in ajustes %}
+
+    <tr>
+
+        <td>{{ ajuste[1] }}</td>
+        <td>{{ ajuste[2] }}</td>
+        <td>{{ ajuste[3] }}</td>
+        <td>{{ ajuste[4] }}</td>
+        <td>
+            {% if ajuste[5] == 'Pendente' %}
+                <span style="color:orange;">● Pendente</span>
+            {% elif ajuste[5] == 'Aprovado' %}
+                <span style="color:green;">● Aprovado</span>
+            {% else %}
+                <span style="color:red;">● Reprovado</span>
+            {% endif %}
+        </td>
+        <td>
+            {% if ajuste[5] == 'Pendente' %}
+            <a href="/aprovar-ajuste/{{ ajuste[0] }}"><button>Aprovar</button></a>
+            <a href="/reprovar-ajuste/{{ ajuste[0] }}"><button>Reprovar</button></a>
+            {% else %}
+                Finalizado
+            {% endif %}
+        </td>
+
+    </tr>
+
+    {% endfor %}
+
+</table>
+
+{% endblock %}

@@ -1,4 +1,4 @@
-{% extends "base_administrador.html" %}
+{% extends "base_gestor_nucleo.html" %}
 
 {% block conteudo %}
 
@@ -14,17 +14,11 @@
 
     <select name="colaborador_id" required>
 
-        <option value="">
-            Selecionar Colaborador
-        </option>
-
-        <option value="all">Todos os colaboradores</option>
+        <option value="">Selecionar Colaborador</option>
 
         {% for colaborador in colaboradores %}
 
-        <option value="{{ colaborador[0] }}">
-            {{ colaborador[1] }}
-        </option>
+        <option value="{{ colaborador[0] }}">{{ colaborador[1] }}</option>
 
         {% endfor %}
 
@@ -40,9 +34,7 @@
 
     <br><br>
 
-    <button type="submit">
-        Visualizar Relatório
-    </button>
+    <button type="submit">Visualizar Relatório</button>
 
 </form>
 
@@ -52,39 +44,24 @@
 
 <h2>Relatório de {{ nome_colaborador }}</h2>
 
-<p>
-
-    <strong>Quantidade de registros:</strong>
-
-    {{ registros|length }}
-
-</p>
+<p><strong>Quantidade de registros:</strong> {{ registros|length }}</p>
 
 <table border="1" cellpadding="10">
 
     <tr>
         <th>Data</th>
-        {% if todos %}
-        <th>Colaborador</th>
-        {% endif %}
         <th>Entrada</th>
         <th>Saída</th>
+        <th>Observação</th>
     </tr>
 
     {% for registro in registros %}
-
     <tr>
-
         <td>{{ registro[0] }}</td>
-        {% if todos %}
-        <td>{{ registro[3] }}</td>
-        {% endif %}
         <td>{{ registro[1] }}</td>
-
         <td>{{ registro[2] or '--:--' }}</td>
-
+        <td>{{ registro[3] or '' }}</td>
     </tr>
-
     {% endfor %}
 
 </table>
@@ -92,24 +69,15 @@
 <br>
 
 <a href="/gerar-excel?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
-    <button type="button">
-        Baixar Excel
-    </button>
+    <button type="button">Baixar Excel</button>
 </a>
-
 <a href="/gerar-pdf?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
-    <button type="button">
-        Baixar PDF
-    </button>
+    <button type="button">Baixar PDF</button>
 </a>
 
 {% else %}
 
-<p>
-
-    Nenhum relatório carregado.
-
-</p>
+<p>Nenhum relatório carregado.</p>
 
 {% endif %}
 

@@ -1,0 +1,43 @@
+{% extends "base_gestor_nucleo.html" %}
+
+{% block conteudo %}
+
+<h1>Colaboradores do Núcleo</h1>
+
+<input
+    type="text"
+    placeholder="Pesquisar colaborador">
+
+<br><br>
+
+<table border="1" cellpadding="10">
+
+    <tr>
+        <th>Nome</th>
+        <th>Núcleo</th>
+        <th>Turno</th>
+        <th>Status</th>
+    </tr>
+
+    {% for colaborador in colaboradores %}
+
+    <tr>
+
+        <td>{{ colaborador[1] }}</td>
+        <td>{{ colaborador[3] }}</td>
+        <td>{{ colaborador[4] }}</td>
+        <td>
+            {% if colaborador[12] == 'Ativo' %}
+                <span style="color:green;">● Ativo</span>
+            {% else %}
+                <span style="color:red;">● Inativo</span>
+            {% endif %}
+        </td>
+
+    </tr>
+
+    {% endfor %}
+
+</table>
+
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "base_gestor_nucleo.html" %}
+
+{% block conteudo %}
+
+<h1>Calendário do Núcleo {{ nucleo }}</h1>
+
+<form action="/adicionar-evento" method="POST" id="evento-form">
+    <input type="hidden" name="titulo" id="titulo" value="">
+
+    <label>Tipo de Evento</label><br>
+    <select name="tipo" id="tipo_evento" required>
+        <option value="">Selecione</option>
+        <option value="Home Office">Home Office</option>
+        <option value="Feriado">Feriado</option>
+        <option value="Ponto Facultativo">Ponto Facultativo</option>
+        <option value="Reunião">Reunião</option>
+        <option value="Evento">Evento</option>
+        <option value="Outro">Outro</option>
+    </select><br><br>
+
+    <div id="outro-titulo-container" style="display: none;">
+        <label>Descreva o evento</label><br>
+        <input type="text" id="titulo_outro" placeholder="Informe o nome do evento" autocomplete="off"><br><br>
+    </div>
+
+    <label>Data</label><br>
+    <input type="date" name="data" required><br><br>
+
+    <label>Descrição</label><br>
+    <textarea name="descricao" rows="4" cols="50" placeholder="Descrição opcional do evento"></textarea><br><br>
+
+    <button type="submit">Adicionar Evento</button>
+</form>
+
+<script>
+    const tipoSelect = document.getElementById('tipo_evento');
+    const tituloInput = document.getElementById('titulo');
+    const outroContainer = document.getElementById('outro-titulo-container');
+    const tituloOutro = document.getElementById('titulo_outro');
+
+    function atualizarTitulo() {
+        const tipo = tipoSelect.value;
+        if (tipo === 'Outro') {
+            outroContainer.style.display = 'block';
+            tituloInput.value = tituloOutro.value.trim();
+            tituloOutro.required = true;
+        } else {
+            outroContainer.style.display = 'none';
+            tituloOutro.required = false;
+            tituloInput.value = tipo;
+        }
+    }
+
+    tipoSelect.addEventListener('change', atualizarTitulo);
+    tituloOutro.addEventListener('input', () => {
+        if (tipoSelect.value === 'Outro') {
+            tituloInput.value = tituloOutro.value.trim();
+        }
+    });
+
+    document.getElementById('evento-form').addEventListener('submit', function(event) {
+        if (tipoSelect.value === 'Outro' && tituloOutro.value.trim() === '') {
+            event.preventDefault();
+            alert('Por favor, informe o nome do evento quando selecionar Outro.');
+            tituloOutro.focus();
+            return false;
+        }
+    });
+</script>
+
+<hr>
+
+<h2>Eventos do Núcleo</h2>
+
+{% if eventos %}
+<form action="/apagar-evento" method="POST" id="excluir-evento-form">
+    <table border="1" cellpadding="10">
+        <tr>
+            <th> </th>
+            <th>Data</th>
+            <th>Tipo</th>
+            <th>Título</th>
+            <th>Descrição</th>
+        </tr>
+        {% for evento in eventos %}
+        <tr>
+            <td style="text-align: center;">
+                <input type="radio" name="event_id" value="{{ evento[0] }}">
+            </td>
+            <td>{{ evento[3] }}</td>
+            <td>{{ evento[2] }}</td>
+            <td>{{ evento[1] }}</td>
+            <td>{{ evento[4] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <br>
+    <button type="submit" id="apagar-evento-button" disabled>Apagar Evento Selecionado</button>
+</form>
+{% else %}
+<p>Não há eventos cadastrados para este núcleo.</p>
+{% endif %}
+
+<script>
+    const excluirForm = document.getElementById('excluir-evento-form');
+    const apagarButton = document.getElementById('apagar-evento-button');
+    const radios = excluirForm ? excluirForm.querySelectorAll('input[name="event_id"]') : [];
+
+    radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            apagarButton.disabled = !Array.from(radios).some(r => r.checked);
+        });
+    });
+</script>
+
+{% endblock %}

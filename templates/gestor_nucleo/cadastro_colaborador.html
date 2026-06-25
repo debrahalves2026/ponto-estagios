@@ -1,4 +1,4 @@
-{% extends "base_administrador.html" %}
+{% extends "base_gestor_nucleo.html" %}
 
 {% block conteudo %}
 
@@ -25,17 +25,11 @@
 
     <br><br>
 
-    <select name="nucleo" required>
-        <option value="">Selecione o Núcleo</option>
-        <option>Assistência de Arbitragens</option>
-        <option>CEFAP</option>
-        <option>GEAC</option>
-        <option>Núcleo Ambiental (NA)</option>
-        <option>Núcleo de Poder de Polícia (NPP)</option>
-        <option>Núcleo de Saúde Pública (NSP)</option>
-        <option>Núcleo Trabalhista (NT)</option>
-        <option>SubCG</option>
-    </select>
+    <input
+        type="text"
+        name="nucleo"
+        value="{{ nucleo }}"
+        readonly>
 
     <br><br>
 

@@ -8,23 +8,6 @@
 
 <hr>
 
-<form method="GET" action="/meu-relatorio">
-
-    <label>Mês de Referência</label>
-
-    <br><br>
-
-    <input
-        type="month"
-        name="mes"
-        value="{{ mes_selecionado }}">
-
-    <button type="submit">
-        Filtrar
-    </button>
-
-</form>
-
 <br>
 
 <table border="1" cellpadding="10">
@@ -83,6 +66,7 @@
     <input
         type="date"
         name="data"
+        class="form-input"
         required>
 
     <br><br>
@@ -91,11 +75,31 @@
 
     <br><br>
 
-    <input
-        type="text"
-        name="observacao"
-        placeholder="Ex.: Presencial, Home Office, Híbrido"
-        required>
+    <select id="observacao-select" class="form-select" required>
+        <option value="" disabled selected>Selecione uma opção</option>
+        <option value="Presencial">Presencial</option>
+        <option value="Home Office">Home Office</option>
+        <option value="Prova">Prova</option>
+        <option value="Feriado">Feriado</option>
+        <option value="Atestado">Atestado</option>
+        <option value="Falta Justificada">Falta Justificada</option>
+        <option value="Férias">Férias</option>
+        <option value="Outros">Outros</option>
+    </select>
+
+    <br><br>
+
+    <div id="observacao-outro-group" style="display:none;">
+        <label>Informe o motivo</label>
+        <br><br>
+        <input
+            type="text"
+            id="observacao-outro"
+            class="form-input"
+            placeholder="Descreva aqui...">
+    </div>
+
+    <input type="hidden" name="observacao" id="observacao-hidden">
 
     <br><br>
 
@@ -105,11 +109,73 @@
 
     </button>
 
+    <script>
+        const observacaoSelect = document.getElementById('observacao-select');
+        const observacaoOutroGroup = document.getElementById('observacao-outro-group');
+        const observacaoOutro = document.getElementById('observacao-outro');
+        const observacaoHidden = document.getElementById('observacao-hidden');
+
+        function updateObservacaoValue() {
+            const selected = observacaoSelect.value;
+            if (selected === 'Outros') {
+                observacaoOutroGroup.style.display = 'block';
+                observacaoOutro.required = true;
+                observacaoHidden.value = observacaoOutro.value.trim();
+            } else {
+                observacaoOutroGroup.style.display = 'none';
+                observacaoOutro.required = false;
+                observacaoHidden.value = selected;
+            }
+        }
+
+        observacaoSelect.addEventListener('change', updateObservacaoValue);
+        observacaoOutro.addEventListener('input', () => {
+            if (observacaoSelect.value === 'Outros') {
+                observacaoHidden.value = observacaoOutro.value.trim();
+            }
+        });
+
+        document.querySelector('form[action="/salvar-observacao"]').addEventListener('submit', function (event) {
+            updateObservacaoValue();
+            if (!observacaoHidden.value) {
+                event.preventDefault();
+                alert('Por favor, selecione uma observação ou informe o motivo.');
+            }
+        });
+
+    </script>
+
 </form>
 
 <hr>
 
 <h2>Exportar Relatório</h2>
+
+<form method="GET" action="/meu-relatorio" class="month-form">
+
+    <label for="mes-input">Selecione uma Data</label>
+
+    <br><br>
+
+    <div class="month-field">
+        <input
+            type="month"
+            id="mes-input"
+            name="mes"
+            class="form-input"
+            title="Selecione uma Data"
+            value="{{ mes_selecionado }}">
+    </div>
+
+    <br>
+
+    <button type="submit">
+        Filtrar
+    </button>
+
+</form>
+
+<br>
 
 <a href="/gerar-excel?mes={{ mes_selecionado }}">
 

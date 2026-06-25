@@ -17,6 +17,7 @@ criar_tabelas()
 
 @app.route('/')
 def inicio():
+    session.clear()
     return render_template('index.html')
 
 
@@ -33,6 +34,11 @@ def login_administrador():
         senha = request.form.get('senha')
 
         if login == 'gestor1' and senha == 'gestor2026':
+
+            session.clear()
+            session['administrador_id'] = 1
+            session['nome_admin'] = 'Administrador'
+
             return redirect('/dashboard-administrador')
 
         return render_template(
@@ -77,6 +83,7 @@ def login_gestor_nucleo():
 
         if gestor:
 
+            session.clear()
             session['gestor_id'] = gestor[0]
             session['nome_gestor'] = gestor[1]
             session['nucleo_gestor'] = gestor[2]
@@ -171,6 +178,9 @@ def dashboard_gestor_nucleo():
 @app.route('/cadastro-gestor')
 def cadastro_gestor():
 
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
     return render_template(
         'administrador/cadastro_gestor.html'
     )
@@ -179,32 +189,57 @@ def cadastro_gestor():
 @app.route('/salvar-gestor', methods=['POST'])
 def salvar_gestor():
 
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        INSERT INTO gestores (
+    nome = request.form.get('nome', '')
+    nucleo = request.form.get('nucleo', '')
+    unidade_exercicio = request.form.get('unidade_exercicio', '')
+    celular = request.form.get('celular', '')
+    login = request.form.get('login', '')
+
+    try:
+        cursor.execute("""
+            INSERT INTO gestores (
+                nome,
+                nucleo,
+                unidade_exercicio,
+                celular,
+                login,
+                senha
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
             nome,
             nucleo,
             unidade_exercicio,
             celular,
             login,
-            senha
+            "Novocolab123"
+        ))
+
+        conn.commit()
+        return redirect('/gestores-cadastrados')
+    except Exception as e:
+        conn.rollback()
+        error_message = 'Erro ao cadastrar gestor. Verifique se o login já existe.'
+        if 'UNIQUE constraint failed' in str(e):
+            error_message = 'Já existe um gestor cadastrado com esse login.'
+
+        return render_template(
+            'administrador/cadastro_gestor.html',
+            erro=error_message,
+            nome=nome,
+            nucleo=nucleo,
+            unidade_exercicio=unidade_exercicio,
+            celular=celular,
+            login=login
         )
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        request.form['nome'],
-        request.form['nucleo'],
-        request.form['unidade_exercicio'],
-        request.form['celular'],
-        request.form['login'],
-        "Novocolab123"
-    ))
-
-    conn.commit()
-    conn.close()
-
-    return redirect('/gestores-cadastrados')
+    finally:
+        conn.close()
 
 # =========================
 # GESTORES CADASTRADOS
@@ -212,6 +247,9 @@ def salvar_gestor():
 
 @app.route('/editar-gestor/<int:id>')
 def editar_gestor(id):
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
 
     conn = conectar()
     cursor = conn.cursor()
@@ -237,6 +275,9 @@ def editar_gestor(id):
 @app.route('/atualizar-gestor/<int:id>', methods=['POST'])
 def atualizar_gestor(id):
 
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -260,15 +301,43 @@ def atualizar_gestor(id):
     return redirect('/gestores-cadastrados')
 
 
-@app.route('/cancelar-gestor/<int:id>')
+@app.route('/cancelar-gestor/<int:id>', methods=['POST'])
 def cancelar_gestor(id):
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
+    motivo = request.form.get('motivo_cancelamento', '').strip()
 
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
         UPDATE gestores
-        SET status = 'Inativo'
+        SET status = 'Inativo', cancel_observacao = ?
+        WHERE id = ?
+    """, (
+        motivo,
+        id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/gestores-cadastrados')
+
+@app.route('/recadastrar-gestor/<int:id>', methods=['POST'])
+def recadastrar_gestor(id):
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE gestores
+        SET status = 'Ativo', cancel_observacao = NULL
         WHERE id = ?
     """, (
         id,
@@ -281,6 +350,9 @@ def cancelar_gestor(id):
 
 @app.route('/resetar-senha-gestor/<int:id>')
 def resetar_senha_gestor(id):
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
 
     conn = conectar()
     cursor = conn.cursor()
@@ -299,8 +371,34 @@ def resetar_senha_gestor(id):
 
     return redirect('/gestores-cadastrados')
 
+@app.route('/resetar-senha-colaborador/<int:id>')
+def resetar_senha_colaborador(id):
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE colaboradores
+        SET senha = ?
+        WHERE id = ?
+    """, (
+        "Novocolab123",
+        id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/colaboradores-cadastrados')
+
 @app.route('/gestores-cadastrados')
 def gestores_cadastrados():
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
 
     conn = conectar()
     cursor = conn.cursor()
@@ -353,6 +451,7 @@ def login_colaborador():
 
         if colaborador:
 
+            session.clear()
             session['colaborador_id'] = colaborador[0]
             session['nome'] = colaborador[1]
 
@@ -378,9 +477,18 @@ def login_colaborador():
 @app.route('/cadastro-colaborador')
 def cadastro_colaborador():
 
-    return render_template(
-        'administrador/cadastro_colaborador.html'
-    )
+    if 'administrador_id' in session:
+        return render_template(
+            'administrador/cadastro_colaborador.html'
+        )
+
+    if 'gestor_id' in session:
+        return render_template(
+            'gestor_nucleo/cadastro_colaborador.html',
+            nucleo=session['nucleo_gestor']
+        )
+
+    return redirect('/')
 
 
 # =========================
@@ -462,17 +570,14 @@ def colaboradores_cadastrados():
     cursor = conn.cursor()
 
     # Administrador vê todos os colaboradores
-    if 'gestor_id' not in session:
-
+    if 'administrador_id' in session:
         cursor.execute("""
             SELECT *
             FROM colaboradores
             ORDER BY nome
         """)
 
-    # Gestor do Núcleo vê somente os colaboradores do seu núcleo
-    else:
-
+    elif 'gestor_id' in session:
         cursor.execute("""
             SELECT *
             FROM colaboradores
@@ -482,12 +587,21 @@ def colaboradores_cadastrados():
             session['nucleo_gestor'],
         ))
 
+    else:
+        return redirect('/login-administrador')
+
     colaboradores = cursor.fetchall()
 
     conn.close()
 
+    if 'administrador_id' in session:
+        return render_template(
+            'administrador/colaboradores.html',
+            colaboradores=colaboradores
+        )
+
     return render_template(
-        'administrador/colaboradores.html',
+        'gestor_nucleo/colaboradores.html',
         colaboradores=colaboradores
     )
 
@@ -603,8 +717,15 @@ def solicitacoes_ajuste():
 
     conn.close()
 
+    if 'administrador_id' in session:
+        template_name = 'administrador/solicitacoes_ajuste.html'
+    elif 'gestor_id' in session:
+        template_name = 'gestor_nucleo/solicitacoes_ajuste.html'
+    else:
+        return redirect('/login-gestor-nucleo')
+
     return render_template(
-        'administrador/solicitacoes_ajuste.html',
+        template_name,
         ajustes=ajustes
     )
 
@@ -736,9 +857,106 @@ def meus_ajustes():
 @app.route('/calendario')
 def calendario():
 
-    return render_template(
-        'administrador/calendario.html'
-    )
+    conn = conectar()
+    cursor = conn.cursor()
+
+    if 'gestor_id' in session:
+        cursor.execute("""
+            SELECT id, titulo, tipo, data, descricao
+            FROM eventos
+            WHERE nucleo = ?
+            ORDER BY data
+        """, (
+            session['nucleo_gestor'],
+        ))
+        eventos = cursor.fetchall()
+        conn.close()
+        return render_template('gestor_nucleo/calendario.html', eventos=eventos, nucleo=session['nucleo_gestor'])
+
+    if 'administrador_id' in session:
+        cursor.execute("""
+            SELECT id, titulo, tipo, data, descricao, nucleo
+            FROM eventos
+            ORDER BY data
+        """)
+        eventos = cursor.fetchall()
+        conn.close()
+        return render_template('administrador/calendario.html', eventos=eventos)
+
+    conn.close()
+    return redirect('/login-gestor-nucleo')
+
+
+@app.route('/adicionar-evento', methods=['POST'])
+def adicionar_evento():
+
+    if 'gestor_id' not in session:
+        return redirect('/login-gestor-nucleo')
+
+    titulo = request.form.get('titulo', '').strip()
+    tipo = request.form.get('tipo', '').strip()
+    data = request.form.get('data', '').strip()
+    descricao = request.form.get('descricao', '').strip()
+
+    if not titulo or not tipo or not data:
+        return redirect('/calendario')
+
+    try:
+        data_formatada = datetime.strptime(data, '%Y-%m-%d').strftime('%d/%m/%Y')
+    except ValueError:
+        data_formatada = data
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO eventos (
+            titulo,
+            tipo,
+            data,
+            descricao,
+            nucleo
+        ) VALUES (?, ?, ?, ?, ?)
+    """, (
+        titulo,
+        tipo,
+        data_formatada,
+        descricao,
+        session['nucleo_gestor']
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/calendario')
+
+
+@app.route('/apagar-evento', methods=['POST'])
+def apagar_evento():
+
+    if 'gestor_id' not in session:
+        return redirect('/login-gestor-nucleo')
+
+    evento_id = request.form.get('event_id')
+    if not evento_id:
+        return redirect('/calendario')
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        DELETE FROM eventos
+        WHERE id = ?
+        AND nucleo = ?
+    """, (
+        evento_id,
+        session['nucleo_gestor']
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/calendario')
 
 
 # =========================
@@ -778,10 +996,18 @@ def relatorios():
 
     conn.close()
 
+    if 'administrador_id' in session:
+        template_name = 'administrador/relatorios.html'
+    elif 'gestor_id' in session:
+        template_name = 'gestor_nucleo/relatorios.html'
+    else:
+        return redirect('/login-gestor-nucleo')
+
     return render_template(
-        'administrador/relatorios.html',
+        template_name,
         colaboradores=colaboradores,
-        registros=None
+        registros=None,
+        todos=False
     )
 
 
@@ -793,6 +1019,8 @@ def relatorios():
 def visualizar_relatorio():
 
     colaborador_id = request.form['colaborador_id']
+
+    mes = request.form.get('mes')
 
     conn = conectar()
     cursor = conn.cursor()
@@ -824,6 +1052,17 @@ def visualizar_relatorio():
     # Segurança adicional para Gestor do Núcleo
     if 'gestor_id' in session:
 
+        if colaborador_id == 'all':
+            conn.close()
+            return render_template(
+                'gestor_nucleo/relatorios.html',
+                colaboradores=colaboradores,
+                registros=None,
+                erro='Opção inválida.',
+                mes=mes,
+                todos=False
+            )
+
         cursor.execute("""
             SELECT id
             FROM colaboradores
@@ -839,46 +1078,138 @@ def visualizar_relatorio():
         if not permissao:
 
             conn.close()
-
             return render_template(
-                'administrador/relatorios.html',
+                'gestor_nucleo/relatorios.html',
                 colaboradores=colaboradores,
                 registros=None,
-                erro='Você não possui permissão para visualizar este colaborador.'
+                erro='Você não possui permissão para visualizar este colaborador.',
+                mes=mes,
+                todos=False
             )
 
-    # Busca os registros
-    cursor.execute("""
-        SELECT
-            data,
-            entrada,
-            saida_final
-        FROM registros_ponto
-        WHERE colaborador_id = ?
-        ORDER BY id DESC
-    """, (
-        colaborador_id,
-    ))
+    # Busca os registros — filtra por mês/ano se fornecido
+    if mes:
+        # campo <input type="month"> envia 'YYYY-MM'
+        try:
+            ano, mes_num = mes.split('-')
+        except ValueError:
+            ano = None
+            mes_num = None
 
-    registros = cursor.fetchall()
+    else:
+        ano = None
+        mes_num = None
 
-    cursor.execute("""
-        SELECT nome
-        FROM colaboradores
-        WHERE id = ?
-    """, (
-        colaborador_id,
-    ))
+    if colaborador_id == 'all':
+        if 'administrador_id' not in session:
+            conn.close()
+            return redirect('/login-administrador')
 
-    nome_colaborador = cursor.fetchone()[0]
+        if ano and mes_num:
+            cursor.execute("""
+                SELECT
+                    registros_ponto.data,
+                    registros_ponto.entrada,
+                    registros_ponto.saida_final,
+                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
+                    colaboradores.nome
+                FROM registros_ponto
+                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                    AND eventos.nucleo = colaboradores.nucleo
+                WHERE substr(registros_ponto.data,4,2) = ?
+                AND substr(registros_ponto.data,7,4) = ?
+                GROUP BY registros_ponto.id
+                ORDER BY registros_ponto.id DESC
+            """, (
+                mes_num,
+                ano
+            ))
+        else:
+            cursor.execute("""
+                SELECT
+                    registros_ponto.data,
+                    registros_ponto.entrada,
+                    registros_ponto.saida_final,
+                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
+                    colaboradores.nome
+                FROM registros_ponto
+                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                    AND eventos.nucleo = colaboradores.nucleo
+                GROUP BY registros_ponto.id
+                ORDER BY registros_ponto.id DESC
+            """)
+
+        registros = cursor.fetchall()
+        nome_colaborador = 'Todos os colaboradores'
+        todos = True
+
+    else:
+        if ano and mes_num:
+            cursor.execute("""
+                SELECT
+                    registros_ponto.data,
+                    registros_ponto.entrada,
+                    registros_ponto.saida_final,
+                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
+                FROM registros_ponto
+                LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                    AND eventos.nucleo = (SELECT nucleo FROM colaboradores WHERE id = registros_ponto.colaborador_id)
+                WHERE colaborador_id = ?
+                AND substr(registros_ponto.data,4,2) = ?
+                AND substr(registros_ponto.data,7,4) = ?
+                GROUP BY registros_ponto.id
+                ORDER BY registros_ponto.id DESC
+            """, (
+                colaborador_id,
+                mes_num,
+                ano
+            ))
+
+        else:
+            cursor.execute("""
+                SELECT
+                    registros_ponto.data,
+                    registros_ponto.entrada,
+                    registros_ponto.saida_final,
+                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
+                FROM registros_ponto
+                LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                    AND eventos.nucleo = (SELECT nucleo FROM colaboradores WHERE id = registros_ponto.colaborador_id)
+                WHERE colaborador_id = ?
+                GROUP BY registros_ponto.id
+                ORDER BY registros_ponto.id DESC
+            """, (
+                colaborador_id,
+            ))
+        registros = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT nome
+            FROM colaboradores
+            WHERE id = ?
+        """, (
+            colaborador_id,
+        ))
+
+        nome_colaborador = cursor.fetchone()[0]
+        todos = False
 
     conn.close()
 
+    template_name = 'administrador/relatorios.html'
+    if 'gestor_id' in session:
+        template_name = 'gestor_nucleo/relatorios.html'
+
     return render_template(
-        'administrador/relatorios.html',
+        template_name,
         colaboradores=colaboradores,
         registros=registros,
-        nome_colaborador=nome_colaborador
+        nome_colaborador=nome_colaborador,
+        mes=mes,
+        todos=todos,
+        colaborador_id=colaborador_id
     )
 
 # =========================
@@ -938,15 +1269,38 @@ def salvar_colaborador():
 # CANCELAR COLABORADOR
 # =========================
 
-@app.route('/cancelar-colaborador/<int:id>')
+@app.route('/cancelar-colaborador/<int:id>', methods=['POST'])
 def cancelar_colaborador(id):
+
+    motivo = request.form.get('motivo_cancelamento', '').strip()
 
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
         UPDATE colaboradores
-        SET status = 'Inativo'
+        SET status = 'Inativo', cancel_observacao = ?
+        WHERE id = ?
+    """, (
+        motivo,
+        id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/colaboradores-cadastrados')
+
+
+@app.route('/recadastrar-colaborador/<int:id>', methods=['POST'])
+def recadastrar_colaborador(id):
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE colaboradores
+        SET status = 'Ativo', cancel_observacao = NULL
         WHERE id = ?
     """, (
         id,
@@ -1035,15 +1389,16 @@ def registrar_entrada():
 
     hora_atual = request.form['entrada']
 
+    data_hoje = datetime.now(
+        ZoneInfo("America/Sao_Paulo")
+    ).strftime('%d/%m/%Y')
+
     cursor.execute("""
         SELECT id
         FROM registros_ponto
         WHERE colaborador_id = ?
         AND data = ?
-    """, (
-        session['colaborador_id'],
-        data_hoje
-    ))
+    """, (session['colaborador_id'], data_hoje))
 
     registro = cursor.fetchone()
 
@@ -1084,6 +1439,10 @@ def registrar_saida_final():
 
     hora_atual = request.form['saida_final']
 
+    data_hoje = datetime.now(
+        ZoneInfo("America/Sao_Paulo")
+    ).strftime('%d/%m/%Y')
+
     cursor.execute("""
         UPDATE registros_ponto
         SET saida_final = ?
@@ -1120,15 +1479,19 @@ def meu_relatorio():
 
         cursor.execute("""
             SELECT
-                data,
-                entrada,
-                saida_final,
-                observacao
+                registros_ponto.data,
+                registros_ponto.entrada,
+                registros_ponto.saida_final,
+                COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
             FROM registros_ponto
+            LEFT JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+            LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                AND eventos.nucleo = colaboradores.nucleo
             WHERE colaborador_id = ?
             AND substr(data,4,2) = ?
             AND substr(data,7,4) = ?
-            ORDER BY id DESC
+            GROUP BY registros_ponto.id
+            ORDER BY registros_ponto.id DESC
         """, (
             session['colaborador_id'],
             mes,
@@ -1139,17 +1502,20 @@ def meu_relatorio():
 
         cursor.execute("""
             SELECT
-                data,
-                entrada,
-                saida_final,
-                observacao
+                registros_ponto.data,
+                registros_ponto.entrada,
+                registros_ponto.saida_final,
+                COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
             FROM registros_ponto
+            LEFT JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+            LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                AND eventos.nucleo = colaboradores.nucleo
             WHERE colaborador_id = ?
-            ORDER BY id DESC
+            GROUP BY registros_ponto.id
+            ORDER BY registros_ponto.id DESC
         """, (session['colaborador_id'],))
 
     registros = cursor.fetchall()
-
     conn.close()
 
     return render_template(
@@ -1202,7 +1568,10 @@ from reportlab.pdfgen import canvas
 @app.route('/gerar-pdf')
 def gerar_pdf():
 
-    if 'colaborador_id' not in session:
+    colaborador_id = request.args.get('colaborador_id')
+    mes_selecionado = request.args.get('mes')
+
+    if 'administrador_id' not in session and 'gestor_id' not in session and 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
     from database.conexao import conectar
@@ -1210,154 +1579,291 @@ def gerar_pdf():
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT
-            nome,
-            nucleo,
-            horario
-        FROM colaboradores
-        WHERE id = ?
-    """, (session['colaborador_id'],))
+    if 'administrador_id' in session or 'gestor_id' in session:
+        if not colaborador_id:
+            conn.close()
+            return redirect('/relatorios')
 
-    colaborador = cursor.fetchone()
+        if colaborador_id == 'all':
+            if 'administrador_id' not in session:
+                conn.close()
+                return redirect('/relatorios')
 
-    mes_selecionado = request.args.get('mes')
+            colaborador = ('Todos os Colaboradores', '', '')
+        else:
+            cursor.execute("""
+                SELECT
+                    nome,
+                    nucleo,
+                    horario
+                FROM colaboradores
+                WHERE id = ?
+            """, (colaborador_id,))
+            colaborador = cursor.fetchone()
+
+            if not colaborador:
+                conn.close()
+                return redirect('/relatorios')
+
+            if 'gestor_id' in session:
+                cursor.execute("""
+                    SELECT id
+                    FROM colaboradores
+                    WHERE id = ?
+                    AND nucleo = ?
+                """, (colaborador_id, session['nucleo_gestor']))
+                if not cursor.fetchone():
+                    conn.close()
+                    return redirect('/relatorios')
+    else:
+        colaborador_id = session['colaborador_id']
+        cursor.execute("""
+            SELECT
+                nome,
+                nucleo,
+                horario
+            FROM colaboradores
+            WHERE id = ?
+        """, (colaborador_id,))
+        colaborador = cursor.fetchone()
 
     print("MES PDF:", mes_selecionado)
 
-    cursor.execute("""
-        SELECT
-            data,
-            entrada,
-            saida_final,
-            observacao
-        FROM registros_ponto
-        WHERE colaborador_id = ?
-        ORDER BY data
-    """, (session['colaborador_id'],))
+    if colaborador_id == 'all':
+        if mes_selecionado and "-" in mes_selecionado:
+            ano, mes = mes_selecionado.split('-')
+            cursor.execute("""
+                SELECT
+                    registros_ponto.data,
+                    registros_ponto.entrada,
+                    registros_ponto.saida_final,
+                    registros_ponto.observacao,
+                    colaboradores.nome
+                FROM registros_ponto
+                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                WHERE substr(registros_ponto.data,4,2) = ?
+                AND substr(registros_ponto.data,7,4) = ?
+                ORDER BY registros_ponto.data
+            """, (
+                mes,
+                ano
+            ))
+        else:
+            cursor.execute("""
+                SELECT
+                    registros_ponto.data,
+                    registros_ponto.entrada,
+                    registros_ponto.saida_final,
+                    registros_ponto.observacao,
+                    colaboradores.nome
+                FROM registros_ponto
+                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                ORDER BY registros_ponto.data
+            """)
+        registros = cursor.fetchall()
+        nome_colaborador = colaborador[0].replace(" ", "_")
 
-    registros = cursor.fetchall()
-
-    conn.close()
-
-    nome_colaborador = colaborador[0].replace(" ", "_")
-
-    if mes_selecionado and "-" in mes_selecionado:
-
-        ano = mes_selecionado.split('-')[0]
-        mes = mes_selecionado.split('-')[1]
-
-        arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.pdf"
-
+        if mes_selecionado and "-" in mes_selecionado:
+            ano = mes_selecionado.split('-')[0]
+            mes = mes_selecionado.split('-')[1]
+            arquivo = f"Folha_Frequencia_Todos_Colaboradores_{mes}_{ano}.pdf"
+        else:
+            arquivo = f"Folha_Frequencia_Todos_Colaboradores.pdf"
     else:
+        if mes_selecionado and "-" in mes_selecionado:
+            ano, mes = mes_selecionado.split('-')
+            cursor.execute("""
+                SELECT
+                    data,
+                    entrada,
+                    saida_final,
+                    observacao
+                FROM registros_ponto
+                WHERE colaborador_id = ?
+                AND substr(data,4,2) = ?
+                AND substr(data,7,4) = ?
+                ORDER BY data
+            """, (
+                colaborador_id,
+                mes,
+                ano
+            ))
+        else:
+            cursor.execute("""
+                SELECT
+                    data,
+                    entrada,
+                    saida_final,
+                    observacao
+                FROM registros_ponto
+                WHERE colaborador_id = ?
+                ORDER BY data
+            """, (colaborador_id,))
+        registros = cursor.fetchall()
+        nome_colaborador = colaborador[0].replace(" ", "_")
 
-        arquivo = f"Folha_Frequencia_{nome_colaborador}.pdf"
+        if mes_selecionado and "-" in mes_selecionado:
+            ano = mes_selecionado.split('-')[0]
+            mes = mes_selecionado.split('-')[1]
+            arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.pdf"
+        else:
+            arquivo = f"Folha_Frequencia_{nome_colaborador}.pdf"
 
-    doc = SimpleDocTemplate(arquivo)
-
-    estilos = getSampleStyleSheet()
-
-    elementos = []
-
-    elementos.append(
-        Paragraph(
-            "<b>FOLHA DE FREQUÊNCIA</b>",
-            estilos['Title']
-        )
-    )
-
-    if mes_selecionado:
-
+    if colaborador_id == 'all':
+        doc = SimpleDocTemplate(arquivo)
+        estilos = getSampleStyleSheet()
+        elementos = []
         elementos.append(
             Paragraph(
-                f"<b>Competência:</b> {mes}/{ano}",
+                "<b>FOLHA DE FREQUÊNCIA</b>",
+                estilos['Title']
+            )
+        )
+        if mes_selecionado and "-" in mes_selecionado:
+            elementos.append(
+                Paragraph(
+                    f"<b>Competência:</b> {mes}/{ano}",
+                    estilos['Normal']
+                )
+            )
+            elementos.append(Spacer(1, 12))
+        elementos.append(
+            Paragraph(
+                f"<b>Relatório:</b> Todos os colaboradores",
                 estilos['Normal']
             )
         )
-
-        elementos.append(Spacer(1, 12))
-
-    elementos.append(
-        Paragraph(
-            f"<b>Nome:</b> {colaborador[0]}",
-            estilos['Normal']
+        elementos.append(Spacer(1, 20))
+        dados = [
+            ["Data", "Entrada", "Saída", "Observação", "Colaborador"]
+        ]
+        for registro in registros:
+            dados.append([
+                registro[0],
+                registro[1] or "",
+                registro[2] or "",
+                registro[3] or "",
+                registro[4] or ""
+            ])
+        tabela = Table(dados)
+        tabela.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ]))
+        elementos.append(tabela)
+        elementos.append(Spacer(1, 120))
+        elementos.append(
+            Paragraph(
+                "<b>VISTO</b>",
+                estilos['Title']
+            )
         )
-    )
-
-    elementos.append(
-        Paragraph(
-            f"<b>Núcleo:</b> {colaborador[1]}",
-            estilos['Normal']
+        elementos.append(Spacer(1, 50))
+        assinaturas = Table([
+            [
+                "__________________________________",
+                "__________________________________"
+            ],
+            [
+                colaborador[0],
+                "ASSINATURA/CARIMBO"
+            ],
+            [
+                "Relatório Abrangente",
+                "PROCURADOR DO ESTADO"
+            ]
+        ], colWidths=[250, 250])
+        assinaturas.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ]))
+        elementos.append(assinaturas)
+        doc.build(elementos)
+    else:
+        doc = SimpleDocTemplate(arquivo)
+        estilos = getSampleStyleSheet()
+        elementos = []
+        elementos.append(
+            Paragraph(
+                "<b>FOLHA DE FREQUÊNCIA</b>",
+                estilos['Title']
+            )
         )
-    )
-
-    elementos.append(
-        Paragraph(
-            f"<b>Horário:</b> {colaborador[2]}",
-            estilos['Normal']
+        if mes_selecionado and "-" in mes_selecionado:
+            elementos.append(
+                Paragraph(
+                    f"<b>Competência:</b> {mes}/{ano}",
+                    estilos['Normal']
+                )
+            )
+            elementos.append(Spacer(1, 12))
+        elementos.append(
+            Paragraph(
+                f"<b>Nome:</b> {colaborador[0]}",
+                estilos['Normal']
+            )
         )
-    )
-
-    elementos.append(Spacer(1, 20))
-
-    dados = [
-        ["Data", "Entrada", "Saída", "Observação"]
-    ]
-
-    for registro in registros:
-
-        dados.append([
-            registro[0],
-            registro[1] or "",
-            registro[2] or "",
-            registro[3] or ""
-        ])
-
-    tabela = Table(dados)
-
-    tabela.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-    ]))
-
-    elementos.append(tabela)
-
-    elementos.append(Spacer(1, 120))
-
-    elementos.append(
-    Paragraph(
-        "<b>VISTO</b>",
-        estilos['Title']
-    )
-)
-
-    elementos.append(Spacer(1, 50))
-
-    assinaturas = Table([
-    [
-        "__________________________________",
-        "__________________________________"
-    ],
-    [
-        colaborador[0],
-        "ASSINATURA/CARIMBO"
-    ],
-    [
-        "Assinatura do Colaborador",
-        "PROCURADOR DO ESTADO"
-    ]
-], colWidths=[250, 250])
-    
-    assinaturas.setStyle(TableStyle([
-    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-    ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-]))
-
-    elementos.append(assinaturas)
-
-    doc.build(elementos)
+        elementos.append(
+            Paragraph(
+                f"<b>Núcleo:</b> {colaborador[1]}",
+                estilos['Normal']
+            )
+        )
+        elementos.append(
+            Paragraph(
+                f"<b>Horário:</b> {colaborador[2]}",
+                estilos['Normal']
+            )
+        )
+        elementos.append(Spacer(1, 20))
+        dados = [
+            ["Data", "Entrada", "Saída", "Observação"]
+        ]
+        for registro in registros:
+            dados.append([
+                registro[0],
+                registro[1] or "",
+                registro[2] or "",
+                registro[3] or ""
+            ])
+        tabela = Table(dados)
+        tabela.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ]))
+        elementos.append(tabela)
+        elementos.append(Spacer(1, 120))
+        elementos.append(
+            Paragraph(
+                "<b>VISTO</b>",
+                estilos['Title']
+            )
+        )
+        elementos.append(Spacer(1, 50))
+        assinaturas = Table([
+            [
+                "__________________________________",
+                "__________________________________"
+            ],
+            [
+                colaborador[0],
+                "ASSINATURA/CARIMBO"
+            ],
+            [
+                "Assinatura do Colaborador",
+                "PROCURADOR DO ESTADO"
+            ]
+        ], colWidths=[250, 250])
+        assinaturas.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ]))
+        elementos.append(assinaturas)
+        doc.build(elementos)
 
     return send_file(
         arquivo,
@@ -1367,7 +1873,10 @@ def gerar_pdf():
 @app.route('/gerar-excel')
 def gerar_excel():
 
-    if 'colaborador_id' not in session:
+    colaborador_id = request.args.get('colaborador_id')
+    mes_selecionado = request.args.get('mes')
+
+    if 'administrador_id' not in session and 'gestor_id' not in session and 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
     from database.conexao import conectar
@@ -1375,87 +1884,184 @@ def gerar_excel():
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT
-            nome,
-            nucleo,
-            horario
-        FROM colaboradores
-        WHERE id = ?
-    """, (session['colaborador_id'],))
+    if 'administrador_id' in session or 'gestor_id' in session:
+        if not colaborador_id:
+            conn.close()
+            return redirect('/relatorios')
 
-    colaborador = cursor.fetchone()
+        if colaborador_id == 'all':
+            if 'administrador_id' not in session:
+                conn.close()
+                return redirect('/relatorios')
+            colaborador = ('Todos os Colaboradores', '', '')
+        else:
+            cursor.execute("""
+                SELECT
+                    nome,
+                    nucleo,
+                    horario
+                FROM colaboradores
+                WHERE id = ?
+            """, (colaborador_id,))
+            colaborador = cursor.fetchone()
+            if not colaborador:
+                conn.close()
+                return redirect('/relatorios')
+            if 'gestor_id' in session:
+                cursor.execute("""
+                    SELECT id
+                    FROM colaboradores
+                    WHERE id = ?
+                    AND nucleo = ?
+                """, (colaborador_id, session['nucleo_gestor']))
+                if not cursor.fetchone():
+                    conn.close()
+                    return redirect('/relatorios')
+    else:
+        colaborador_id = session['colaborador_id']
+        cursor.execute("""
+            SELECT
+                nome,
+                nucleo,
+                horario
+            FROM colaboradores
+            WHERE id = ?
+        """, (colaborador_id,))
+        colaborador = cursor.fetchone()
 
-    mes_selecionado = request.args.get('mes')
+    print("MES EXCEL:", mes_selecionado)
 
-    print("MES PDF:", mes_selecionado)
-
-    cursor.execute("""
-        SELECT
-            data,
-            entrada,
-            saida_final,
-            observacao
-        FROM registros_ponto
-        WHERE colaborador_id = ?
-        ORDER BY data
-    """, (session['colaborador_id'],))
+    if colaborador_id == 'all':
+        if mes_selecionado and "-" in mes_selecionado:
+            ano, mes = mes_selecionado.split('-')
+            cursor.execute("""
+                SELECT
+                    data,
+                    entrada,
+                    saida_final,
+                    observacao,
+                    colaboradores.nome
+                FROM registros_ponto
+                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                WHERE substr(registros_ponto.data,4,2) = ?
+                AND substr(registros_ponto.data,7,4) = ?
+                ORDER BY data
+            """, (
+                mes,
+                ano
+            ))
+        else:
+            cursor.execute("""
+                SELECT
+                    data,
+                    entrada,
+                    saida_final,
+                    observacao,
+                    colaboradores.nome
+                FROM registros_ponto
+                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                ORDER BY data
+            """)
+    else:
+        if mes_selecionado and "-" in mes_selecionado:
+            ano, mes = mes_selecionado.split('-')
+            cursor.execute("""
+                SELECT
+                    data,
+                    entrada,
+                    saida_final,
+                    observacao
+                FROM registros_ponto
+                WHERE colaborador_id = ?
+                AND substr(data,4,2) = ?
+                AND substr(data,7,4) = ?
+                ORDER BY data
+            """, (
+                colaborador_id,
+                mes,
+                ano
+            ))
+        else:
+            cursor.execute("""
+                SELECT
+                    data,
+                    entrada,
+                    saida_final,
+                    observacao
+                FROM registros_ponto
+                WHERE colaborador_id = ?
+                ORDER BY data
+            """, (colaborador_id,))
 
     registros = cursor.fetchall()
-
     conn.close()
 
     wb = Workbook()
-
     ws = wb.active
-
     ws.title = "Frequência"
-
     ws['A1'] = "FOLHA DE FREQUÊNCIA"
 
-    if mes_selecionado and "-" in mes_selecionado:
-
-        ano = mes_selecionado.split('-')[0]
-        mes = mes_selecionado.split('-')[1]
-
-        ws['A2'] = f"Competência: {mes}/{ano}"
-
-    ws['A3'] = "Nome"
-    ws['B3'] = colaborador[0]
-
-    ws['A4'] = "Núcleo"
-    ws['B4'] = colaborador[1]
-
-    ws['A5'] = "Horário"
-    ws['B5'] = colaborador[2]
-
-    ws.append([])
-
-    ws.append([
-        "Data",
-        "Entrada",
-        "Saída",
-        "Observação"
-    ])
-
-    for registro in registros:
-
+    if colaborador_id == 'all':
+        if mes_selecionado and "-" in mes_selecionado:
+            ano = mes_selecionado.split('-')[0]
+            mes = mes_selecionado.split('-')[1]
+            ws['A2'] = f"Competência: {mes}/{ano}"
+        ws['A3'] = "Relatório"
+        ws['B3'] = "Todos os Colaboradores"
+        ws['A4'] = "Núcleo"
+        ws['B4'] = "Todos"
+        ws['A5'] = "Horário"
+        ws['B5'] = "Todos"
+        ws.append([])
         ws.append([
-            registro[0],
-            registro[1] or "",
-            registro[2] or "",
-            registro[3] or ""
+            "Data",
+            "Entrada",
+            "Saída",
+            "Observação",
+            "Colaborador"
         ])
-
-    nome_colaborador = colaborador[0].replace(" ", "_")
-
-    if mes_selecionado:
-
-        arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.xlsx"
-
+        for registro in registros:
+            ws.append([
+                registro[0],
+                registro[1] or "",
+                registro[2] or "",
+                registro[3] or "",
+                registro[4] or ""
+            ])
+        if mes_selecionado and "-" in mes_selecionado:
+            arquivo = f"Folha_Frequencia_Todos_Colaboradores_{mes}_{ano}.xlsx"
+        else:
+            arquivo = f"Folha_Frequencia_Todos_Colaboradores.xlsx"
     else:
-
-        arquivo = f"Folha_Frequencia_{nome_colaborador}.xlsx"
+        if mes_selecionado and "-" in mes_selecionado:
+            ano = mes_selecionado.split('-')[0]
+            mes = mes_selecionado.split('-')[1]
+            ws['A2'] = f"Competência: {mes}/{ano}"
+        ws['A3'] = "Nome"
+        ws['B3'] = colaborador[0]
+        ws['A4'] = "Núcleo"
+        ws['B4'] = colaborador[1]
+        ws['A5'] = "Horário"
+        ws['B5'] = colaborador[2]
+        ws.append([])
+        ws.append([
+            "Data",
+            "Entrada",
+            "Saída",
+            "Observação"
+        ])
+        for registro in registros:
+            ws.append([
+                registro[0],
+                registro[1] or "",
+                registro[2] or "",
+                registro[3] or ""
+            ])
+        nome_colaborador = colaborador[0].replace(" ", "_")
+        if mes_selecionado and "-" in mes_selecionado:
+            arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.xlsx"
+        else:
+            arquivo = f"Folha_Frequencia_{nome_colaborador}.xlsx"
 
     wb.save(arquivo)
 

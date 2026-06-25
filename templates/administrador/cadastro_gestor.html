@@ -4,42 +4,59 @@
 
 <h1>Cadastrar Gestor</h1>
 
+    {% if erro %}
+        <div class="form-error">{{ erro }}</div>
+        <br>
+    {% endif %}
+
 <form action="/salvar-gestor" method="POST">
 
     <input
         type="text"
         name="nome"
         placeholder="Nome Completo"
+        value="{{ nome or '' }}"
         required>
 
     <br><br>
 
     <select name="nucleo" required>
         <option value="">Selecione o Núcleo</option>
-        <option>Assistência de Arbitragens</option>
-        <option>CEFAP</option>
-        <option>GEAC</option>
-        <option>Núcleo Ambiental (NA)</option>
-        <option>Núcleo de Poder de Polícia (NPP)</option>
-        <option>Núcleo de Saúde Pública (NSP)</option>
-        <option>Núcleo Trabalhista (NT)</option>
-        <option>SubCG</option>
+        <option {% if nucleo == 'Assistência de Arbitragens' %}selected{% endif %}>Assistência de Arbitragens</option>
+        <option {% if nucleo == 'CEFAP' %}selected{% endif %}>CEFAP</option>
+        <option {% if nucleo == 'GEAC' %}selected{% endif %}>GEAC</option>
+        <option {% if nucleo == 'Núcleo Ambiental (NA)' %}selected{% endif %}>Núcleo Ambiental (NA)</option>
+        <option {% if nucleo == 'Núcleo de Poder de Polícia (NPP)' %}selected{% endif %}>Núcleo de Poder de Polícia (NPP)</option>
+        <option {% if nucleo == 'Núcleo de Saúde Pública (NSP)' %}selected{% endif %}>Núcleo de Saúde Pública (NSP)</option>
+        <option {% if nucleo == 'Núcleo Trabalhista (NT)' %}selected{% endif %}>Núcleo Trabalhista (NT)</option>
+        <option {% if nucleo == 'SubCG' %}selected{% endif %}>SubCG</option>
+    </select>
+
+    <br><br>
+
+    <select name="unidade_exercicio" required>
+        <option value="">Unidade de Exercício</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional da Grande São Paulo (PR01)' %}selected{% endif %}>Procuradoria Regional da Grande São Paulo (PR01)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Santos (PR02)' %}selected{% endif %}>Procuradoria Regional de Santos (PR02)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Taubaté (PR03)' %}selected{% endif %}>Procuradoria Regional de Taubaté (PR03)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Sorocaba (PR04)' %}selected{% endif %}>Procuradoria Regional de Sorocaba (PR04)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Campinas (PR05)' %}selected{% endif %}>Procuradoria Regional de Campinas (PR05)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Ribeirão Preto (PR06)' %}selected{% endif %}>Procuradoria Regional de Ribeirão Preto (PR06)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Bauru (PR07)' %}selected{% endif %}>Procuradoria Regional de Bauru (PR07)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de São José do Rio Preto (PR08)' %}selected{% endif %}>Procuradoria Regional de São José do Rio Preto (PR08)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Araçatuba (PR09)' %}selected{% endif %}>Procuradoria Regional de Araçatuba (PR09)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Presidente Prudente (PR10)' %}selected{% endif %}>Procuradoria Regional de Presidente Prudente (PR10)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de Marília (PR11)' %}selected{% endif %}>Procuradoria Regional de Marília (PR11)</option>
+        <option {% if unidade_exercicio == 'Procuradoria Regional de São Carlos (PR12)' %}selected{% endif %}>Procuradoria Regional de São Carlos (PR12)</option>
     </select>
 
     <br><br>
 
     <input
         type="text"
-        name="unidade_exercicio"
-        placeholder="Unidade de Exercício"
-        required>
-
-    <br><br>
-
-    <input
-        type="text"
         name="celular"
-        placeholder="Número do Celular">
+        placeholder="Número do Celular"
+        value="{{ celular or '' }}">
 
     <br><br>
 
@@ -47,6 +64,7 @@
         type="text"
         name="login"
         placeholder="Login do Gestor"
+        value="{{ login or '' }}"
         required>
 
     <br><br>
