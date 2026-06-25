@@ -1488,8 +1488,8 @@ def meu_relatorio():
             LEFT JOIN eventos ON eventos.data = registros_ponto.data
                 AND eventos.nucleo = colaboradores.nucleo
             WHERE colaborador_id = ?
-            AND substr(data,4,2) = ?
-            AND substr(data,7,4) = ?
+            AND substr(registros_ponto.data,4,2) = ?
+            AND substr(registros_ponto.data,7,4) = ?
             GROUP BY registros_ponto.id
             ORDER BY registros_ponto.id DESC
         """, (
