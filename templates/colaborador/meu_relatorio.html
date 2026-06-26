@@ -10,7 +10,11 @@
 
 <br>
 
-<table border="1" cellpadding="10">
+<button type="button" id="toggle-relatorio-btn">{% if mes_selecionado %}Ocultar pontos batidos{% else %}Mostrar pontos batidos{% endif %}</button>
+
+<br><br>
+
+<table id="relatorio-tabela" border="1" cellpadding="10" style="display: {% if mes_selecionado %}table{% else %}none{% endif %};">
 
     <tr>
         <th>Data</th>
@@ -212,5 +216,16 @@
     </button>
 
 </a>
+
+<script>
+    const toggleBtn = document.getElementById('toggle-relatorio-btn');
+    const relatorioTabela = document.getElementById('relatorio-tabela');
+
+    toggleBtn.addEventListener('click', function () {
+        const isHidden = relatorioTabela.style.display === 'none';
+        relatorioTabela.style.display = isHidden ? 'table' : 'none';
+        toggleBtn.textContent = isHidden ? 'Ocultar pontos batidos' : 'Mostrar pontos batidos';
+    });
+</script>
 
 {% endblock %}
