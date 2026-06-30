@@ -47,9 +47,10 @@
     <input
         type="time"
         name="entrada"
-        required>
+        required
+        {% if entrada_registrada %}disabled{% endif %}>
 
-    <button type="submit">
+    <button type="submit" {% if entrada_registrada %}disabled{% endif %}>
 
         Salvar Entrada
 
@@ -68,9 +69,10 @@
     <input
         type="time"
         name="saida_final"
-        required>
+        required
+        {% if saida_registrada %}disabled{% endif %}>
 
-    <button type="submit">
+    <button type="submit" {% if saida_registrada %}disabled{% endif %}>
 
         Salvar Saída
 

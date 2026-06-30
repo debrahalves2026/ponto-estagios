@@ -217,6 +217,30 @@
 
 </a>
 
+<hr>
+
+<h2>Anexar folha assinada</h2>
+
+<form method="POST" action="/anexar-folha-assinada" enctype="multipart/form-data">
+
+    <label>Selecione o arquivo PDF da folha assinada</label>
+
+    <br><br>
+
+    <input type="file" name="arquivo_folha" accept=".pdf" required>
+
+    <br><br>
+
+    <button type="submit">
+        Enviar folha assinada
+    </button>
+
+</form>
+
+{% if folha_assinada_nome %}
+<p><strong>Arquivo atual:</strong> {{ folha_assinada_nome }}</p>
+{% endif %}
+
 <script>
     const toggleBtn = document.getElementById('toggle-relatorio-btn');
     const relatorioTabela = document.getElementById('relatorio-tabela');

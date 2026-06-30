@@ -81,4 +81,26 @@
 
 {% endif %}
 
+{% if status_folhas %}
+<hr>
+<h2>Status de folhas assinadas</h2>
+<table border="1" cellpadding="10">
+    <tr>
+        <th>Colaborador</th>
+        <th>Status</th>
+    </tr>
+    {% for item in status_folhas %}
+    <tr>
+        <td>{{ item.nome }}</td>
+        <td>{% if item.anexado %}✅ Anexado{% else %}❌ Sem anexo{% endif %}</td>
+    </tr>
+    {% endfor %}
+</table>
+<br>
+<a href="/download-folhas-assinadas">
+    <button type="button">Baixar pacote em PDF</button>
+</a>
+<br><br>
+{% endif %}
+
 {% endblock %}

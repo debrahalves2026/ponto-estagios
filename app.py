@@ -7,6 +7,9 @@ from openpyxl import Workbook
 from database.conexao import conectar
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from werkzeug.utils import secure_filename
+from zipfile import ZipFile
+import os
 import re
 
 app = Flask(__name__)
@@ -625,6 +628,7 @@ def ponto():
 
     cursor.execute("""
         SELECT
+            id,
             entrada,
             saida_final
         FROM registros_ponto
@@ -641,16 +645,23 @@ def ponto():
 
     entrada = "--:--"
     saida_final = "--:--"
+    entrada_registrada = False
+    saida_registrada = False
 
     if registro:
-        entrada = registro[0] or "--:--"
-        saida_final = registro[1] or "--:--"
+        _, entrada_salva, saida_salva = registro
+        entrada = entrada_salva or "--:--"
+        saida_final = saida_salva or "--:--"
+        entrada_registrada = bool((entrada_salva or '').strip())
+        saida_registrada = bool((saida_salva or '').strip())
 
     return render_template(
         'colaborador/ponto.html',
         nome=session['nome'],
         entrada=entrada,
-        saida_final=saida_final
+        saida_final=saida_final,
+        entrada_registrada=entrada_registrada,
+        saida_registrada=saida_registrada
     )
 
 
@@ -959,6 +970,33 @@ def apagar_evento():
     return redirect('/calendario')
 
 
+def _buscar_status_folhas(cursor, nucleo=None):
+    if nucleo is None:
+        cursor.execute("""
+            SELECT id, nome, folha_assinada_path
+            FROM colaboradores
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)
+    else:
+        cursor.execute("""
+            SELECT id, nome, folha_assinada_path
+            FROM colaboradores
+            WHERE status = 'Ativo'
+            AND nucleo = ?
+            ORDER BY nome
+        """, (nucleo,))
+
+    return [
+        {
+            'id': row[0],
+            'nome': row[1],
+            'anexado': bool((row[2] or '').strip())
+        }
+        for row in cursor.fetchall()
+    ]
+
+
 # =========================
 # RELATÓRIOS
 # =========================
@@ -993,6 +1031,7 @@ def relatorios():
         ))
 
     colaboradores = cursor.fetchall()
+    status_folhas = _buscar_status_folhas(cursor, session.get('nucleo_gestor') if 'gestor_id' in session else None)
 
     conn.close()
 
@@ -1007,7 +1046,8 @@ def relatorios():
         template_name,
         colaboradores=colaboradores,
         registros=None,
-        todos=False
+        todos=False,
+        status_folhas=status_folhas
     )
 
 
@@ -1048,6 +1088,7 @@ def visualizar_relatorio():
         ))
 
     colaboradores = cursor.fetchall()
+    status_folhas = _buscar_status_folhas(cursor, session.get('nucleo_gestor') if 'gestor_id' in session else None)
 
     # Segurança adicional para Gestor do Núcleo
     if 'gestor_id' in session:
@@ -1209,7 +1250,8 @@ def visualizar_relatorio():
         nome_colaborador=nome_colaborador,
         mes=mes,
         todos=todos,
-        colaborador_id=colaborador_id
+        colaborador_id=colaborador_id,
+        status_folhas=status_folhas
     )
 
 # =========================
@@ -1394,7 +1436,7 @@ def registrar_entrada():
     ).strftime('%d/%m/%Y')
 
     cursor.execute("""
-        SELECT id
+        SELECT id, entrada, saida_final
         FROM registros_ponto
         WHERE colaborador_id = ?
         AND data = ?
@@ -1403,7 +1445,6 @@ def registrar_entrada():
     registro = cursor.fetchone()
 
     if not registro:
-
         cursor.execute("""
             INSERT INTO registros_ponto (
                 colaborador_id,
@@ -1416,8 +1457,19 @@ def registrar_entrada():
             data_hoje,
             hora_atual
         ))
-
         conn.commit()
+    else:
+        registro_id, entrada_salva, saida_salva = registro
+        if not (entrada_salva or '').strip():
+            cursor.execute("""
+                UPDATE registros_ponto
+                SET entrada = ?
+                WHERE id = ?
+            """, (
+                hora_atual,
+                registro_id
+            ))
+            conn.commit()
 
     conn.close()
 
@@ -1444,17 +1496,30 @@ def registrar_saida_final():
     ).strftime('%d/%m/%Y')
 
     cursor.execute("""
-        UPDATE registros_ponto
-        SET saida_final = ?
+        SELECT id, entrada, saida_final
+        FROM registros_ponto
         WHERE colaborador_id = ?
         AND data = ?
     """, (
-        hora_atual,
         session['colaborador_id'],
         data_hoje
     ))
 
-    conn.commit()
+    registro = cursor.fetchone()
+
+    if registro:
+        registro_id, entrada_salva, saida_salva = registro
+        if not (saida_salva or '').strip():
+            cursor.execute("""
+                UPDATE registros_ponto
+                SET saida_final = ?
+                WHERE id = ?
+            """, (
+                hora_atual,
+                registro_id
+            ))
+            conn.commit()
+
     conn.close()
 
     return redirect('/ponto')
@@ -1516,13 +1581,113 @@ def meu_relatorio():
         """, (session['colaborador_id'],))
 
     registros = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT folha_assinada_nome
+        FROM colaboradores
+        WHERE id = ?
+    """, (session['colaborador_id'],))
+    folha_assinada = cursor.fetchone()
+
     conn.close()
 
     return render_template(
         'colaborador/meu_relatorio.html',
         registros=registros,
         nome=session['nome'],
-        mes_selecionado=mes_selecionado
+        mes_selecionado=mes_selecionado,
+        folha_assinada_nome=folha_assinada[0] if folha_assinada else None
+    )
+
+
+@app.route('/anexar-folha-assinada', methods=['POST'])
+def anexar_folha_assinada():
+
+    if 'colaborador_id' not in session:
+        return redirect('/login-colaborador')
+
+    arquivo = request.files.get('arquivo_folha')
+    if not arquivo or arquivo.filename == '':
+        return redirect('/meu-relatorio')
+
+    if not arquivo.filename.lower().endswith('.pdf'):
+        return redirect('/meu-relatorio')
+
+    pasta_upload = os.path.abspath('uploads/folhas_assinadas')
+    os.makedirs(pasta_upload, exist_ok=True)
+
+    nome_seguro = secure_filename(arquivo.filename)
+    nome_arquivo = f"{session['colaborador_id']}_{nome_seguro}"
+    caminho_arquivo = os.path.join(pasta_upload, nome_arquivo)
+    arquivo.save(caminho_arquivo)
+
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE colaboradores
+        SET folha_assinada_path = ?, folha_assinada_nome = ?
+        WHERE id = ?
+    """, (
+        caminho_arquivo,
+        nome_seguro,
+        session['colaborador_id']
+    ))
+    conn.commit()
+    conn.close()
+
+    return redirect('/meu-relatorio')
+
+
+@app.route('/download-folhas-assinadas')
+def download_folhas_assinadas():
+
+    if 'administrador_id' not in session and 'gestor_id' not in session:
+        return redirect('/login-gestor-nucleo')
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    if 'gestor_id' in session:
+        cursor.execute("""
+            SELECT id, nome, folha_assinada_path
+            FROM colaboradores
+            WHERE status = 'Ativo'
+            AND nucleo = ?
+            AND folha_assinada_path IS NOT NULL
+            AND trim(folha_assinada_path) != ''
+            ORDER BY nome
+        """, (session['nucleo_gestor'],))
+    else:
+        cursor.execute("""
+            SELECT id, nome, folha_assinada_path
+            FROM colaboradores
+            WHERE status = 'Ativo'
+            AND folha_assinada_path IS NOT NULL
+            AND trim(folha_assinada_path) != ''
+            ORDER BY nome
+        """)
+
+    anexos = cursor.fetchall()
+    conn.close()
+
+    if not anexos:
+        return redirect('/relatorios')
+
+    pasta_upload = os.path.abspath('uploads/folhas_assinadas')
+    os.makedirs(pasta_upload, exist_ok=True)
+
+    nome_zip = os.path.join(pasta_upload, f"pacote_folhas_assinadas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+
+    with ZipFile(nome_zip, 'w') as zip_file:
+        for colaborador_id, nome, caminho in anexos:
+            if os.path.exists(caminho):
+                nome_arquivo_zip = f"{nome.replace('/', '_').replace('\\', '_')}_{colaborador_id}.pdf"
+                zip_file.write(caminho, arcname=nome_arquivo_zip)
+
+    return send_file(
+        nome_zip,
+        as_attachment=True,
+        download_name='pacote_folhas_assinadas.zip'
     )
 
 

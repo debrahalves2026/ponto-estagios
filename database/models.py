@@ -75,6 +75,10 @@ def criar_tabelas():
     columns = [row[1] for row in cursor.fetchall()]
     if 'cancel_observacao' not in columns:
         cursor.execute("ALTER TABLE colaboradores ADD COLUMN cancel_observacao TEXT")
+    if 'folha_assinada_path' not in columns:
+        cursor.execute("ALTER TABLE colaboradores ADD COLUMN folha_assinada_path TEXT")
+    if 'folha_assinada_nome' not in columns:
+        cursor.execute("ALTER TABLE colaboradores ADD COLUMN folha_assinada_nome TEXT")
 
     cursor.execute("PRAGMA table_info(gestores)")
     columns = [row[1] for row in cursor.fetchall()]
