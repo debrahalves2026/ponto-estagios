@@ -1,0 +1,86 @@
+{% extends "base_administrador.html" %}
+
+{% block conteudo %}
+
+<h1>Editar Gestor</h1>
+
+<form action="/atualizar-gestor/{{ gestor[0] }}" method="POST">
+
+    <input
+        type="text"
+        name="nome"
+        placeholder="Nome Completo"
+        value="{{ gestor[1] }}"
+        required>
+
+    <br><br>
+
+    <select name="nucleo" required>
+        <option value="">Selecione o Núcleo</option>
+        <option {% if gestor[2] == 'Assistência de Arbitragens' %}selected{% endif %}>Assistência de Arbitragens</option>
+        <option {% if gestor[2] == 'Coordenadoria de Execuções Contra a Fazenda Pública (CEFAP)' %}selected{% endif %}>Coordenadoria de Execuções Contra a Fazenda Pública (CEFAP)</option>
+        <option {% if gestor[2] == 'Grupo Especial de Atuação do Contencioso Geral (GEAC)' %}selected{% endif %}>Grupo Especial de Atuação do Contencioso Geral (GEAC)</option>
+        <option {% if gestor[2] == 'Núcleo Ambiental (NA)' %}selected{% endif %}>Núcleo Ambiental (NA)</option>
+        <option {% if gestor[2] == 'Núcleo de Poder de Polícia (NPP)' %}selected{% endif %}>Núcleo de Poder de Polícia (NPP)</option>
+        <option {% if gestor[2] == 'Núcleo de Saúde Pública (NSP)' %}selected{% endif %}>Núcleo de Saúde Pública (NSP)</option>
+        <option {% if gestor[2] == 'Núcleo Trabalhista (NT)' %}selected{% endif %}>Núcleo Trabalhista (NT)</option>
+        <option {% if gestor[2] == 'SubCG' %}selected{% endif %}>SubCG</option>
+        <option {% if gestor[2] == 'Núcleo de Contencioso PGE DETRAN' %}selected{% endif %}>Núcleo de Contencioso PGE DETRAN</option>
+        <option {% if gestor[2] == 'Núcleo de Gestão e Prevenção de Demandas Repetitivas (GPDR)' %}selected{% endif %}>Núcleo de Gestão e Prevenção de Demandas Repetitivas (GPDR)</option>
+        <option {% if gestor[2] == 'Núcleo de Pessoal Carreiras de Estado (NPCE)' %}selected{% endif %}>Núcleo de Pessoal Carreiras de Estado (NPCE)</option>
+        <option {% if gestor[2] == 'Núcleo de Pessoal Educação (NPE)' %}selected{% endif %}>Núcleo de Pessoal Educação (NPE)</option>
+        <option {% if gestor[2] == 'Núcleo de Pessoal Militar (NPM)' %}selected{% endif %}>Núcleo de Pessoal Militar (NPM)</option>
+        <option {% if gestor[2] == 'Núcleo de Pessoal Residual (NPR)' %}selected{% endif %}>Núcleo de Pessoal Residual (NPR)</option>
+        <option {% if gestor[2] == 'Núcleo de Políticas Públicas (NPPublicas)' %}selected{% endif %}>Núcleo de Políticas Públicas (NPPublicas)</option>
+        <option {% if gestor[2] == 'Núcleo de Propositura de Ações (NPA)' %}selected{% endif %}>Núcleo de Propositura de Ações (NPA)</option>
+        <option {% if gestor[2] == 'Núcleo de Regulações e Contratações Públicas (NRCP)' %}selected{% endif %}>Núcleo de Regulações e Contratações Públicas (NRCP)</option>
+        <option {% if gestor[2] == 'Núcleo de Responsabilidade Civil (NRC)' %}selected{% endif %}>Núcleo de Responsabilidade Civil (NRC)</option>
+        <option {% if gestor[2] == 'Núcleo Estratégico de Pessoal e Previdenciário (NEPP)' %}selected{% endif %}>Núcleo Estratégico de Pessoal e Previdenciário (NEPP)</option>
+        <option {% if gestor[2] == 'Núcleo Imobiliário (NI)' %}selected{% endif %}>Núcleo Imobiliário (NI)</option>
+        <option {% if gestor[2] == 'Núcleo Previdenciário (SPPREV)' %}selected{% endif %}>Núcleo Previdenciário (SPPREV)</option>
+        <option {% if gestor[2] == 'Núcleo Responsabilidade Subsidiária de Serviços Terceirizados (NRST)' %}selected{% endif %}>Núcleo Responsabilidade Subsidiária de Serviços Terceirizados (NRST)</option>
+        <option {% if gestor[2] == 'Procuradoria do Estado de São Paulo em Brasília (PESPB)' %}selected{% endif %}>Procuradoria do Estado de São Paulo em Brasília (PESPB)</option>
+    </select>
+
+    <br><br>
+
+    <select name="unidade_exercicio" required>
+        <option value="">Unidade de Exercício</option>
+        <option {% if gestor[3] == 'Procuradoria Regional da Grande São Paulo (PR01)' %}selected{% endif %}>Procuradoria Regional da Grande São Paulo (PR01)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Santos (PR02)' %}selected{% endif %}>Procuradoria Regional de Santos (PR02)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Taubaté (PR03)' %}selected{% endif %}>Procuradoria Regional de Taubaté (PR03)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Sorocaba (PR04)' %}selected{% endif %}>Procuradoria Regional de Sorocaba (PR04)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Campinas (PR05)' %}selected{% endif %}>Procuradoria Regional de Campinas (PR05)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Ribeirão Preto (PR06)' %}selected{% endif %}>Procuradoria Regional de Ribeirão Preto (PR06)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Bauru (PR07)' %}selected{% endif %}>Procuradoria Regional de Bauru (PR07)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de São José do Rio Preto (PR08)' %}selected{% endif %}>Procuradoria Regional de São José do Rio Preto (PR08)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Araçatuba (PR09)' %}selected{% endif %}>Procuradoria Regional de Araçatuba (PR09)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Presidente Prudente (PR10)' %}selected{% endif %}>Procuradoria Regional de Presidente Prudente (PR10)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de Marília (PR11)' %}selected{% endif %}>Procuradoria Regional de Marília (PR11)</option>
+        <option {% if gestor[3] == 'Procuradoria Regional de São Carlos (PR12)' %}selected{% endif %}>Procuradoria Regional de São Carlos (PR12)</option>
+    </select>
+
+    <br><br>
+
+    <input
+        type="text"
+        name="celular"
+        placeholder="Número do Celular"
+        value="{{ gestor[4] or '' }}">
+
+    <br><br>
+
+    <input
+        type="text"
+        name="login"
+        placeholder="Login do Gestor"
+        value="{{ gestor[5] or '' }}"
+        required>
+
+    <br><br>
+
+    <button type="submit">Salvar Alterações</button>
+
+</form>
+
+{% endblock %}

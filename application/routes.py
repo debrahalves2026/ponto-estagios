@@ -2034,7 +2034,7 @@ def lancar_ponto():
 
     with db_cursor() as cursor:
         cursor.execute("""
-        SELECT id, nome
+        SELECT id, nome, nucleo
         FROM colaboradores
         WHERE status = 'Ativo'
         ORDER BY nome
