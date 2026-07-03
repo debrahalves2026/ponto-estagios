@@ -832,6 +832,12 @@ def _buscar_status_folhas(cursor, nucleo=None):
         }
         for row in cursor.fetchall()
     ]
+
+def _todos_folhas_anexadas(status_folhas):
+    """Verifica se todos os colaboradores têm folha anexada"""
+    if not status_folhas:
+        return False
+    return all(item.get('anexado', False) for item in status_folhas)
 # RELATÓRIOS
 
 @main_bp.route('/relatorios')
@@ -875,7 +881,8 @@ def relatorios():
         colaboradores=colaboradores,
         registros=None,
         todos=False,
-        status_folhas=status_folhas
+        status_folhas=status_folhas,
+        todos_anexados=_todos_folhas_anexadas(status_folhas)
     )
 # VISUALIZAR RELATÓRIO
 
@@ -922,7 +929,9 @@ def visualizar_relatorio():
                 registros=None,
                 erro='Opção inválida.',
                 mes=mes,
-                todos=False
+                todos=False,
+                status_folhas=status_folhas,
+                todos_anexados=_todos_folhas_anexadas(status_folhas)
             )
 
         cursor.execute("""
@@ -944,7 +953,9 @@ def visualizar_relatorio():
                 registros=None,
                 erro='Você não possui permissão para visualizar este colaborador.',
                 mes=mes,
-                todos=False
+                todos=False,
+                status_folhas=status_folhas,
+                todos_anexados=_todos_folhas_anexadas(status_folhas)
             )
 
     # Busca os registros — filtra por mês/ano se fornecido
@@ -1066,7 +1077,8 @@ def visualizar_relatorio():
         mes=mes,
         todos=todos,
         colaborador_id=colaborador_id,
-        status_folhas=status_folhas
+        status_folhas=status_folhas,
+        todos_anexados=_todos_folhas_anexadas(status_folhas)
     )
 # SALVAR COLABORADOR
 

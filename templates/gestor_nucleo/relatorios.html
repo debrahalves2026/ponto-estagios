@@ -98,7 +98,7 @@
 </table>
 <br>
 <a href="/download-folhas-assinadas">
-    <button type="button">Baixar pacote em PDF</button>
+    <button type="button" {% if not todos_anexados %}disabled{% endif %} title="{% if not todos_anexados %}Todos os colaboradores precisam ter a folha anexada{% else %}Baixar pacote{% endif %}">Baixar pacote em PDF</button>
 </a>
 <br><br>
 {% endif %}
