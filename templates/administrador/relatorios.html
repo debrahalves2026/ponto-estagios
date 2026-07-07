@@ -36,7 +36,7 @@
 
     <br><br>
 
-    <input type="month" name="mes" placeholder="Mês e Ano" title="Mês e Ano" {% if mes %} value="{{ mes }}" {% endif %}>
+    <input type="month" name="mes" placeholder="Mês e Ano" title="Mês e Ano" {% if mes %} value="{{ mes }}" {% else %} value="{{ mes_atual }}" {% endif %}>
 
     <br><br>
 

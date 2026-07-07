@@ -567,8 +567,12 @@ def ponto():
 @main_bp.route('/ajuste-ponto')
 def ajuste_ponto():
 
+    # Data atual no formato YYYY-MM-DD para o input type="date"
+    data_atual = datetime.now().strftime('%Y-%m-%d')
+    
     return render_template(
-        'colaborador/ajuste_ponto.html'
+        'colaborador/ajuste_ponto.html',
+        data_atual=data_atual
     )
 # SOLICITAÇÕES DE AJUSTE
 
@@ -721,6 +725,9 @@ def meus_ajustes():
 @main_bp.route('/calendario')
 def calendario():
 
+    # Data atual no formato YYYY-MM-DD para o input type="date"
+    data_atual = datetime.now().strftime('%Y-%m-%d')
+
     with db_cursor() as cursor:
         if 'gestor_id' in session:
             cursor.execute("""
@@ -732,7 +739,7 @@ def calendario():
                 session['nucleo_gestor'],
             ))
             eventos = cursor.fetchall()
-            return render_template('gestor_nucleo/calendario.html', eventos=eventos, nucleo=session['nucleo_gestor'])
+            return render_template('gestor_nucleo/calendario.html', eventos=eventos, nucleo=session['nucleo_gestor'], data_atual=data_atual)
 
         if 'administrador_id' in session:
             cursor.execute("""
@@ -741,7 +748,7 @@ def calendario():
                 ORDER BY data
             """)
         eventos = cursor.fetchall()
-        return render_template('administrador/calendario.html', eventos=eventos)
+        return render_template('administrador/calendario.html', eventos=eventos, data_atual=data_atual)
     return redirect('/login-gestor-nucleo')
 
 
@@ -876,13 +883,17 @@ def relatorios():
     else:
         return redirect('/login-gestor-nucleo')
 
+    # Data atual no formato YYYY-MM para o input type="month"
+    mes_atual = datetime.now().strftime('%Y-%m')
+
     return render_template(
         template_name,
         colaboradores=colaboradores,
         registros=None,
         todos=False,
         status_folhas=status_folhas,
-        todos_anexados=_todos_folhas_anexadas(status_folhas)
+        todos_anexados=_todos_folhas_anexadas(status_folhas),
+        mes_atual=mes_atual
     )
 # VISUALIZAR RELATÓRIO
 
@@ -1349,12 +1360,17 @@ def meu_relatorio():
         WHERE id = ?
     """, (session['colaborador_id'],))
     folha_assinada = cursor.fetchone()
+    
+    # Data atual no formato YYYY-MM para o input type="month"
+    mes_atual = datetime.now().strftime('%Y-%m')
+    
     return render_template(
         'colaborador/meu_relatorio.html',
         registros=registros,
         nome=session['nome'],
-        mes_selecionado=mes_selecionado,
-        folha_assinada_nome=folha_assinada[0] if folha_assinada else None
+        mes_selecionado=mes_selecionado if mes_selecionado else mes_atual,
+        folha_assinada_nome=folha_assinada[0] if folha_assinada else None,
+        mes_atual=mes_atual
     )
 
 
@@ -1650,35 +1666,6 @@ def gerar_pdf():
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ]))
         elementos.append(tabela)
-        elementos.append(Spacer(1, 120))
-        elementos.append(
-            Paragraph(
-                "<b>VISTO</b>",
-                estilos['Title']
-            )
-        )
-        elementos.append(Spacer(1, 50))
-        assinaturas = Table([
-            [
-                "__________________________________",
-                "__________________________________"
-            ],
-            [
-                colaborador[0],
-                "ASSINATURA/CARIMBO"
-            ],
-            [
-                "Relatório Abrangente",
-                "PROCURADOR DO ESTADO"
-            ]
-        ], colWidths=[250, 250])
-        assinaturas.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ]))
-        elementos.append(assinaturas)
         doc.build(elementos)
     else:
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
@@ -1754,7 +1741,7 @@ def gerar_pdf():
                 "ASSINATURA/CARIMBO"
             ],
             [
-                "Assinatura do Colaborador",
+                "Relatório Abrangente",
                 "PROCURADOR DO ESTADO"
             ]
         ], colWidths=[250, 250])
@@ -2041,9 +2028,14 @@ def lancar_ponto():
     """)
 
     colaboradores = cursor.fetchall()
+    
+    # Data atual no formato YYYY-MM-DD para o input type="date"
+    data_atual = datetime.now().strftime('%Y-%m-%d')
+    
     return render_template(
         'administrador/lancar_ponto.html',
-        colaboradores=colaboradores
+        colaboradores=colaboradores,
+        data_atual=data_atual
     )
 
 @main_bp.route('/salvar-lancamento-ponto', methods=['POST'])
