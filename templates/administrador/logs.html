@@ -1,0 +1,50 @@
+{% extends "base_administrador.html" %}
+
+{% block conteudo %}
+
+<h1>Logs do Sistema</h1>
+
+<p>Histórico de alterações e ações realizadas no sistema.</p>
+
+<p><strong>Atualização automática:</strong> a página recarrega a cada 20 segundos.</p>
+
+<hr>
+
+<div style="overflow-x:auto;">
+    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse; background:#fff;">
+        <thead>
+            <tr>
+                <th>Data/Hora</th>
+                <th>Perfil</th>
+                <th>Usuário</th>
+                <th>Ação</th>
+                <th>Detalhes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if logs %}
+                {% for item in logs %}
+                <tr>
+                    <td>{{ item[0] }}</td>
+                    <td>{{ item[1] }}</td>
+                    <td>{{ item[2] }}</td>
+                    <td>{{ item[3] }}</td>
+                    <td>{{ item[4] }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5">Nenhum log registrado até o momento.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+setInterval(function () {
+    window.location.reload();
+}, 20000);
+</script>
+
+{% endblock %}

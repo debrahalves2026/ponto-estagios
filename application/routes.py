@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, session, send_file, after_this_request
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from openpyxl import Workbook
 from datetime import datetime
@@ -22,6 +23,39 @@ from .app_utils import (
 )
 
 main_bp = Blueprint('main', __name__)
+
+
+def _usuario_log_atual():
+    if 'administrador_id' in session:
+        return 'Administrador', session.get('nome_admin', 'Administrador')
+    if 'gestor_id' in session:
+        return 'Gestor', session.get('nome_gestor', 'Gestor')
+    if 'colaborador_id' in session:
+        return 'Colaborador', session.get('nome', 'Colaborador')
+    return 'Sistema', 'Sistema'
+
+
+def _registrar_log(cursor, acao, detalhes):
+    tipo_usuario, nome_usuario = _usuario_log_atual()
+    data_hora = datetime.now(
+        ZoneInfo("America/Sao_Paulo")
+    ).strftime('%d/%m/%Y %H:%M:%S')
+    cursor.execute("""
+        INSERT INTO logs_sistema (
+            data_hora,
+            tipo_usuario,
+            nome_usuario,
+            acao,
+            detalhes
+        )
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        data_hora,
+        tipo_usuario,
+        nome_usuario,
+        acao,
+        detalhes
+    ))
 
 @main_bp.route('/')
 def inicio():
@@ -205,6 +239,11 @@ def salvar_gestor():
             login,
             "Novocolab123"
         ))
+        _registrar_log(
+            cursor,
+            'Cadastro de gestor',
+            f"{session.get('nome_admin', 'Administrador')} cadastrou o gestor {nome}."
+        )
 
         return redirect('/gestores-cadastrados')
     except Exception as e:
@@ -635,6 +674,9 @@ def solicitacoes_ajuste():
 def aprovar_ajuste(id):
 
     with db_cursor(commit=True) as cursor:
+        permissao = True
+        nome_colaborador = 'Colaborador'
+
         # Segurança para Gestor do Núcleo
         if 'gestor_id' in session:
 
@@ -655,11 +697,26 @@ def aprovar_ajuste(id):
         if not permissao:
             return redirect('/solicitacoes-ajuste')
 
-    cursor.execute("""
-        UPDATE ajustes_ponto
-        SET status = 'Aprovado'
-        WHERE id = ?
-    """, (id,))
+        cursor.execute("""
+            SELECT colaboradores.nome
+            FROM ajustes_ponto
+            INNER JOIN colaboradores ON colaboradores.id = ajustes_ponto.colaborador_id
+            WHERE ajustes_ponto.id = ?
+        """, (id,))
+        ajuste_info = cursor.fetchone()
+        if ajuste_info:
+            nome_colaborador = ajuste_info[0]
+
+        cursor.execute("""
+            UPDATE ajustes_ponto
+            SET status = 'Aprovado'
+            WHERE id = ?
+        """, (id,))
+        _registrar_log(
+            cursor,
+            'Aprovação de ajuste',
+            f"{session.get('nome_admin') or session.get('nome_gestor', 'Usuário')} aprovou ajuste de {nome_colaborador}."
+        )
 
     return redirect('/solicitacoes-ajuste')
 # REPROVAR AJUSTE
@@ -668,6 +725,8 @@ def aprovar_ajuste(id):
 def reprovar_ajuste(id):
 
     with db_cursor(commit=True) as cursor:
+        nome_colaborador = 'Colaborador'
+
         # Segurança para Gestor do Núcleo
         if 'gestor_id' in session:
             cursor.execute("""
@@ -688,10 +747,25 @@ def reprovar_ajuste(id):
                 return redirect('/solicitacoes-ajuste')
 
         cursor.execute("""
+            SELECT colaboradores.nome
+            FROM ajustes_ponto
+            INNER JOIN colaboradores ON colaboradores.id = ajustes_ponto.colaborador_id
+            WHERE ajustes_ponto.id = ?
+        """, (id,))
+        ajuste_info = cursor.fetchone()
+        if ajuste_info:
+            nome_colaborador = ajuste_info[0]
+
+        cursor.execute("""
             UPDATE ajustes_ponto
             SET status = 'Reprovado'
             WHERE id = ?
         """, (id,))
+        _registrar_log(
+            cursor,
+            'Reprovação de ajuste',
+            f"{session.get('nome_admin') or session.get('nome_gestor', 'Usuário')} reprovou ajuste de {nome_colaborador}."
+        )
 
     return redirect('/solicitacoes-ajuste')
 # MEUS AJUSTES
@@ -894,6 +968,51 @@ def relatorios():
         status_folhas=status_folhas,
         todos_anexados=_todos_folhas_anexadas(status_folhas),
         mes_atual=mes_atual
+    )
+
+
+@main_bp.route('/autenticar-logs', methods=['POST'])
+def autenticar_logs():
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
+    login = request.form.get('login_logs', '').strip()
+    senha = request.form.get('senha_logs', '')
+
+    if login == 'Pge.nati' and senha == 'Nati@ti2026':
+        session['logs_auth_ok'] = True
+        return redirect('/logs')
+
+    return redirect('/dashboard-administrador?erro_logs=1')
+
+
+@main_bp.route('/logs')
+def logs_sistema():
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
+
+    if not session.get('logs_auth_ok'):
+        return redirect('/dashboard-administrador?erro_logs=1')
+
+    with db_cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                data_hora,
+                tipo_usuario,
+                nome_usuario,
+                acao,
+                detalhes
+            FROM logs_sistema
+            ORDER BY id DESC
+            LIMIT 500
+        """)
+        logs = cursor.fetchall()
+
+    return render_template(
+        'administrador/logs.html',
+        logs=logs
     )
 # VISUALIZAR RELATÓRIO
 
@@ -1132,6 +1251,11 @@ def salvar_colaborador():
         request.form['login'],
         request.form['senha']
     ))
+        _registrar_log(
+            cursor,
+            'Cadastro de colaborador',
+            f"{session.get('nome_admin', 'Usuário')} cadastrou o colaborador {request.form['nome']}."
+        )
 
     return redirect('/colaboradores-cadastrados')
 # CANCELAR COLABORADOR
@@ -1142,6 +1266,8 @@ def cancelar_colaborador(id):
     motivo = request.form.get('motivo_cancelamento', '').strip()
 
     with db_cursor(commit=True) as cursor:
+        cursor.execute("SELECT nome FROM colaboradores WHERE id = ?", (id,))
+        colaborador_info = cursor.fetchone()
         cursor.execute("""
         UPDATE colaboradores
         SET status = 'Inativo', cancel_observacao = ?
@@ -1150,6 +1276,11 @@ def cancelar_colaborador(id):
         motivo,
         id,
     ))
+        _registrar_log(
+            cursor,
+            'Cancelamento de colaborador',
+            f"{session.get('nome_admin', 'Administrador')} cancelou o colaborador {(colaborador_info[0] if colaborador_info else id)}."
+        )
 
     return redirect('/colaboradores-cadastrados')
 
@@ -1158,6 +1289,8 @@ def cancelar_colaborador(id):
 def recadastrar_colaborador(id):
 
     with db_cursor(commit=True) as cursor:
+        cursor.execute("SELECT nome FROM colaboradores WHERE id = ?", (id,))
+        colaborador_info = cursor.fetchone()
         cursor.execute("""
         UPDATE colaboradores
         SET status = 'Ativo', cancel_observacao = NULL
@@ -1165,6 +1298,11 @@ def recadastrar_colaborador(id):
     """, (
         id,
     ))
+        _registrar_log(
+            cursor,
+            'Recadastro de colaborador',
+            f"{session.get('nome_admin', 'Administrador')} reativou o colaborador {(colaborador_info[0] if colaborador_info else id)}."
+        )
 
     return redirect('/colaboradores-cadastrados')
 # EDITAR COLABORADOR
@@ -1221,44 +1359,53 @@ def registrar_entrada():
 
     with db_cursor(commit=True) as cursor:
         hora_atual = request.form['entrada']
+        data_hoje = datetime.now(
+            ZoneInfo("America/Sao_Paulo")
+        ).strftime('%d/%m/%Y')
 
-    data_hoje = datetime.now(
-        ZoneInfo("America/Sao_Paulo")
-    ).strftime('%d/%m/%Y')
-
-    cursor.execute("""
-        SELECT id, entrada, saida_final
-        FROM registros_ponto
-        WHERE colaborador_id = ?
-        AND data = ?
-    """, (session['colaborador_id'], data_hoje))
-
-    registro = cursor.fetchone()
-
-    if not registro:
         cursor.execute("""
-            INSERT INTO registros_ponto (
-                colaborador_id,
-                data,
-                entrada
-            )
-            VALUES (?, ?, ?)
-        """, (
-            session['colaborador_id'],
-            data_hoje,
-            hora_atual
-        ))
-    else:
-        registro_id, entrada_salva, saida_salva = registro
-        if not (entrada_salva or '').strip():
+            SELECT id, entrada, saida_final
+            FROM registros_ponto
+            WHERE colaborador_id = ?
+            AND data = ?
+        """, (session['colaborador_id'], data_hoje))
+
+        registro = cursor.fetchone()
+
+        if not registro:
             cursor.execute("""
-                UPDATE registros_ponto
-                SET entrada = ?
-                WHERE id = ?
+                INSERT INTO registros_ponto (
+                    colaborador_id,
+                    data,
+                    entrada
+                )
+                VALUES (?, ?, ?)
             """, (
-                hora_atual,
-                registro_id
+                session['colaborador_id'],
+                data_hoje,
+                hora_atual
             ))
+            _registrar_log(
+                cursor,
+                'Registro de entrada',
+                f"{session.get('nome', 'Colaborador')} registrou entrada em {data_hoje} às {hora_atual}."
+            )
+        else:
+            registro_id, entrada_salva, saida_salva = registro
+            if not (entrada_salva or '').strip():
+                cursor.execute("""
+                    UPDATE registros_ponto
+                    SET entrada = ?
+                    WHERE id = ?
+                """, (
+                    hora_atual,
+                    registro_id
+                ))
+                _registrar_log(
+                    cursor,
+                    'Atualização de entrada',
+                    f"{session.get('nome', 'Colaborador')} atualizou entrada em {data_hoje} para {hora_atual}."
+                )
     return redirect('/ponto')
 # REGISTRAR SAÍDA FINAL
 
@@ -1270,34 +1417,38 @@ def registrar_saida_final():
 
     with db_cursor(commit=True) as cursor:
         hora_atual = request.form['saida_final']
+        data_hoje = datetime.now(
+            ZoneInfo("America/Sao_Paulo")
+        ).strftime('%d/%m/%Y')
 
-    data_hoje = datetime.now(
-        ZoneInfo("America/Sao_Paulo")
-    ).strftime('%d/%m/%Y')
+        cursor.execute("""
+            SELECT id, entrada, saida_final
+            FROM registros_ponto
+            WHERE colaborador_id = ?
+            AND data = ?
+        """, (
+            session['colaborador_id'],
+            data_hoje
+        ))
 
-    cursor.execute("""
-        SELECT id, entrada, saida_final
-        FROM registros_ponto
-        WHERE colaborador_id = ?
-        AND data = ?
-    """, (
-        session['colaborador_id'],
-        data_hoje
-    ))
+        registro = cursor.fetchone()
 
-    registro = cursor.fetchone()
-
-    if registro:
-        registro_id, entrada_salva, saida_salva = registro
-        if not (saida_salva or '').strip():
-            cursor.execute("""
-                UPDATE registros_ponto
-                SET saida_final = ?
-                WHERE id = ?
-            """, (
-                hora_atual,
-                registro_id
-            ))
+        if registro:
+            registro_id, entrada_salva, saida_salva = registro
+            if not (saida_salva or '').strip():
+                cursor.execute("""
+                    UPDATE registros_ponto
+                    SET saida_final = ?
+                    WHERE id = ?
+                """, (
+                    hora_atual,
+                    registro_id
+                ))
+                _registrar_log(
+                    cursor,
+                    'Registro de saída',
+                    f"{session.get('nome', 'Colaborador')} registrou saída em {data_hoje} às {hora_atual}."
+                )
     return redirect('/ponto')
 
 @main_bp.route('/meu-relatorio')
@@ -1306,14 +1457,14 @@ def meu_relatorio():
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
+    mes_atual = datetime.now(
+        ZoneInfo("America/Sao_Paulo")
+    ).strftime('%Y-%m')
+    mes_selecionado = request.args.get('mes') or mes_atual
+    ano = mes_selecionado.split('-')[0]
+    mes = mes_selecionado.split('-')[1]
+
     with db_cursor() as cursor:
-        mes_selecionado = request.args.get('mes')
-
-    if mes_selecionado:
-
-        ano = mes_selecionado.split('-')[0]
-        mes = mes_selecionado.split('-')[1]
-
         cursor.execute("""
             SELECT
                 registros_ponto.data,
@@ -1334,41 +1485,25 @@ def meu_relatorio():
             mes,
             ano
         ))
-
-    else:
+        registros = cursor.fetchall()
 
         cursor.execute("""
-            SELECT
-                registros_ponto.data,
-                registros_ponto.entrada,
-                registros_ponto.saida_final,
-                COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
-            FROM registros_ponto
-            LEFT JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-            LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                AND eventos.nucleo = colaboradores.nucleo
-            WHERE colaborador_id = ?
-            GROUP BY registros_ponto.id
-            ORDER BY registros_ponto.id DESC
+            SELECT folha_assinada_nome
+            FROM colaboradores
+            WHERE id = ?
         """, (session['colaborador_id'],))
+        folha_assinada = cursor.fetchone()
 
-    registros = cursor.fetchall()
-
-    cursor.execute("""
-        SELECT folha_assinada_nome
-        FROM colaboradores
-        WHERE id = ?
-    """, (session['colaborador_id'],))
-    folha_assinada = cursor.fetchone()
-    
-    # Data atual no formato YYYY-MM para o input type="month"
-    mes_atual = datetime.now().strftime('%Y-%m')
+    data_atual = datetime.now(
+        ZoneInfo("America/Sao_Paulo")
+    ).strftime('%Y-%m-%d')
     
     return render_template(
         'colaborador/meu_relatorio.html',
         registros=registros,
         nome=session['nome'],
-        mes_selecionado=mes_selecionado if mes_selecionado else mes_atual,
+        mes_selecionado=mes_selecionado,
+        data_atual=data_atual,
         folha_assinada_nome=folha_assinada[0] if folha_assinada else None,
         mes_atual=mes_atual
     )
@@ -1460,27 +1595,30 @@ def salvar_observacao():
 
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
-    from datetime import datetime
 
-    with db_cursor(commit=True) as cursor:
-        data = request.form['data']
-    observacao = request.form['observacao']
-
+    data = request.form['data']
+    observacao = request.form['observacao'].strip()
     data_convertida = datetime.strptime(
         data,
         "%Y-%m-%d"
     ).strftime("%d/%m/%Y")
 
-    cursor.execute("""
-        UPDATE registros_ponto
-        SET observacao = ?
-        WHERE colaborador_id = ?
-        AND data = ?
-    """, (
-        observacao,
-        session['colaborador_id'],
-        data_convertida
-    ))
+    with db_cursor(commit=True) as cursor:
+        cursor.execute("""
+            UPDATE registros_ponto
+            SET observacao = ?
+            WHERE colaborador_id = ?
+            AND data = ?
+        """, (
+            observacao,
+            session['colaborador_id'],
+            data_convertida
+        ))
+        _registrar_log(
+            cursor,
+            'Observação de ponto',
+            f"{session.get('nome', 'Colaborador')} definiu observação '{observacao}' para {data_convertida}."
+        )
 
     return redirect('/meu-relatorio')
 
@@ -1549,12 +1687,15 @@ def gerar_pdf():
                     registros_ponto.data,
                     registros_ponto.entrada,
                     registros_ponto.saida_final,
-                    registros_ponto.observacao,
+                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
                     colaboradores.nome
                 FROM registros_ponto
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                    AND eventos.nucleo = colaboradores.nucleo
                 WHERE substr(registros_ponto.data,4,2) = ?
                 AND substr(registros_ponto.data,7,4) = ?
+                GROUP BY registros_ponto.id
                 ORDER BY registros_ponto.data
             """, (
                 mes,
@@ -1566,10 +1707,13 @@ def gerar_pdf():
                     registros_ponto.data,
                     registros_ponto.entrada,
                     registros_ponto.saida_final,
-                    registros_ponto.observacao,
+                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
                     colaboradores.nome
                 FROM registros_ponto
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                    AND eventos.nucleo = colaboradores.nucleo
+                GROUP BY registros_ponto.id
                 ORDER BY registros_ponto.data
             """)
         registros = cursor.fetchall()
@@ -1586,15 +1730,19 @@ def gerar_pdf():
             ano, mes = mes_selecionado.split('-')
             cursor.execute("""
                 SELECT
-                    data,
-                    entrada,
-                    saida_final,
-                    observacao
+                    registros_ponto.data,
+                    registros_ponto.entrada,
+                    registros_ponto.saida_final,
+                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
                 FROM registros_ponto
-                WHERE colaborador_id = ?
-                AND substr(data,4,2) = ?
-                AND substr(data,7,4) = ?
-                ORDER BY data
+                LEFT JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                    AND eventos.nucleo = colaboradores.nucleo
+                WHERE registros_ponto.colaborador_id = ?
+                AND substr(registros_ponto.data,4,2) = ?
+                AND substr(registros_ponto.data,7,4) = ?
+                GROUP BY registros_ponto.id
+                ORDER BY registros_ponto.data
             """, (
                 colaborador_id,
                 mes,
@@ -1603,13 +1751,17 @@ def gerar_pdf():
         else:
             cursor.execute("""
                 SELECT
-                    data,
-                    entrada,
-                    saida_final,
-                    observacao
+                    registros_ponto.data,
+                    registros_ponto.entrada,
+                    registros_ponto.saida_final,
+                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
                 FROM registros_ponto
-                WHERE colaborador_id = ?
-                ORDER BY data
+                LEFT JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                    AND eventos.nucleo = colaboradores.nucleo
+                WHERE registros_ponto.colaborador_id = ?
+                GROUP BY registros_ponto.id
+                ORDER BY registros_ponto.data
             """, (colaborador_id,))
         registros = cursor.fetchall()
         nome_colaborador = colaborador[0].replace(" ", "_")
@@ -1660,7 +1812,11 @@ def gerar_pdf():
                 registro[3] or "",
                 registro[4] or ""
             ])
-        tabela = Table(dados)
+        tabela = Table(
+         dados,
+         colWidths=[64, 50, 50, 230, 126],
+         rowHeights=18
+        )
         tabela.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
@@ -1671,7 +1827,14 @@ def gerar_pdf():
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
         temp_path = temp_file.name
         temp_file.close()
-        doc = SimpleDocTemplate(temp_path)
+        doc = SimpleDocTemplate(
+            temp_path,
+            pagesize=A4,
+            leftMargin=24,
+            rightMargin=24,
+            topMargin=20,
+            bottomMargin=20
+        )
         estilos = getSampleStyleSheet()
         elementos = []
         elementos.append(
@@ -1706,7 +1869,7 @@ def gerar_pdf():
                 estilos['Normal']
             )
         )
-        elementos.append(Spacer(1, 20))
+        elementos.append(Spacer(1, 12))
         dados = [
             ["Data", "Entrada", "Saída", "Observação"]
         ]
@@ -1717,20 +1880,31 @@ def gerar_pdf():
                 registro[2] or "",
                 registro[3] or ""
             ])
-        tabela = Table(dados)
+        tabela = Table(
+            dados,
+            colWidths=[78, 58, 58, 310],
+            hAlign='CENTER'
+        )
         tabela.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('LEADING', (0, 0), (-1, -1), 10),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elementos.append(tabela)
-        elementos.append(Spacer(1, 120))
+        elementos.append(Spacer(1, 20))
         elementos.append(
             Paragraph(
                 "<b>VISTO</b>",
                 estilos['Title']
             )
         )
-        elementos.append(Spacer(1, 50))
+        elementos.append(Spacer(1, 12))
         assinaturas = Table([
             [
                 "__________________________________",
@@ -1744,12 +1918,13 @@ def gerar_pdf():
                 "Relatório Abrangente",
                 "PROCURADOR DO ESTADO"
             ]
-        ], colWidths=[250, 250])
+        ], colWidths=[260, 260])
         assinaturas.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('FONTSIZE', (0,0), (-1,-1), 10),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
         ]))
         elementos.append(assinaturas)
         doc.build(elementos)
@@ -2051,6 +2226,8 @@ def salvar_lancamento_ponto():
     observacao = request.form['observacao']
 
     with db_cursor(commit=True) as cursor:
+        cursor.execute("SELECT nome FROM colaboradores WHERE id = ?", (colaborador_id,))
+        colaborador_info = cursor.fetchone()
         cursor.execute("""
         INSERT INTO registros_ponto (
             colaborador_id,
@@ -2067,6 +2244,11 @@ def salvar_lancamento_ponto():
         saida_final,
         observacao
     ))
+        _registrar_log(
+            cursor,
+            'Lançamento manual de ponto',
+            f"{session.get('nome_admin', 'Administrador')} lançou ponto para {(colaborador_info[0] if colaborador_info else colaborador_id)} em {data}."
+        )
 
     return redirect('/lancar-ponto')
 
@@ -2091,6 +2273,11 @@ def enviar_ajuste():
         request.form['motivo'],
         'Pendente'
     ))
+        _registrar_log(
+            cursor,
+            'Solicitação de ajuste',
+            f"{session.get('nome', 'Colaborador')} abriu solicitação de ajuste para {request.form['data']}."
+        )
 
     return redirect('/meus-ajustes')
 

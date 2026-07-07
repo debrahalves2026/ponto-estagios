@@ -71,6 +71,17 @@ def criar_tabelas():
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS logs_sistema (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT NOT NULL,
+        tipo_usuario TEXT,
+        nome_usuario TEXT,
+        acao TEXT NOT NULL,
+        detalhes TEXT
+    )
+    """)
+
     cursor.execute("PRAGMA table_info(colaboradores)")
     columns = [row[1] for row in cursor.fetchall()]
     if 'cancel_observacao' not in columns:

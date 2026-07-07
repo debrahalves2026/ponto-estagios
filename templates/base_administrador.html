@@ -42,10 +42,34 @@
         ⏰ Lançar Ponto
     </a>
 
+    <a href="#" id="abrir-logs-modal">
+        📜 Logs
+    </a>
+
     <a href="/">
         🚪 Sair
     </a>
 
+</div>
+
+<div id="logs-auth-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:min(420px, 92vw); border-radius:10px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+        <h3 style="margin-top:0; margin-bottom:8px;">Acesso aos Logs</h3>
+        <p style="margin-top:0; margin-bottom:16px; color:#444;">Digite login e senha para visualizar o histórico do sistema.</p>
+
+        <form method="POST" action="/autenticar-logs">
+            <label for="login_logs">Login</label>
+            <input id="login_logs" name="login_logs" type="text" required style="width:100%; margin-top:6px; margin-bottom:12px; padding:10px; border:1px solid #c7c7c7; border-radius:6px;">
+
+            <label for="senha_logs">Senha</label>
+            <input id="senha_logs" name="senha_logs" type="password" required style="width:100%; margin-top:6px; margin-bottom:16px; padding:10px; border:1px solid #c7c7c7; border-radius:6px;">
+
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button type="button" id="fechar-logs-modal" style="background:#d1d5db; color:#111; border:none; border-radius:6px; padding:10px 14px; cursor:pointer;">Cancelar</button>
+                <button type="submit" style="background:#1e40af; color:#fff; border:none; border-radius:6px; padding:10px 14px; cursor:pointer;">Entrar</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 
@@ -55,6 +79,37 @@
     {% endblock %}
 
 </div>
+
+<script>
+    const logsModal = document.getElementById('logs-auth-modal');
+    const abrirLogsModal = document.getElementById('abrir-logs-modal');
+    const fecharLogsModal = document.getElementById('fechar-logs-modal');
+
+    if (abrirLogsModal) {
+        abrirLogsModal.addEventListener('click', function (event) {
+            event.preventDefault();
+            logsModal.style.display = 'flex';
+        });
+    }
+
+    if (fecharLogsModal) {
+        fecharLogsModal.addEventListener('click', function () {
+            logsModal.style.display = 'none';
+        });
+    }
+
+    if (logsModal) {
+        logsModal.addEventListener('click', function (event) {
+            if (event.target === logsModal) {
+                logsModal.style.display = 'none';
+            }
+        });
+    }
+
+    {% if request.args.get('erro_logs') %}
+    alert('Credenciais de Logs inválidas.');
+    {% endif %}
+</script>
 
 </body>
 </html>
