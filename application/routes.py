@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, request, redirect, session, send_f
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from openpyxl import Workbook
+from openpyxl.styles import Alignment
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
@@ -11,6 +12,7 @@ from zipfile import ZipFile
 import os
 import re
 import tempfile
+from xml.sax.saxutils import escape
 from .app_utils import (
     get_db_connection,
     validate_password,
@@ -21,6 +23,13 @@ from .app_utils import (
     safe_filename,
     db_cursor
 )
+
+def _celula_pdf(valor, estilo):
+    """Prepara o texto para células da tabela PDF com quebra automática."""
+    if valor is None:
+        valor = ""
+    return Paragraph(escape(str(valor)), estilo)
+
 
 main_bp = Blueprint('main', __name__)
 
@@ -1801,25 +1810,49 @@ def gerar_pdf():
             )
         )
         elementos.append(Spacer(1, 20))
+        estilo_celula_tabela = ParagraphStyle(
+            name='CelulaTabelaPDF',
+            parent=estilos['Normal'],
+            fontSize=8,
+            leading=10,
+            wordWrap='CJK'
+        )
+        estilo_cabecalho_tabela = ParagraphStyle(
+            name='CabecalhoTabelaPDF',
+            parent=estilos['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=8,
+            leading=10,
+            alignment=1,
+            wordWrap='CJK'
+        )
+
         dados = [
-            ["Data", "Entrada", "Saída", "Observação", "Colaborador"]
+            [
+                _celula_pdf("Data", estilo_cabecalho_tabela),
+                _celula_pdf("Entrada", estilo_cabecalho_tabela),
+                _celula_pdf("Saída", estilo_cabecalho_tabela),
+                _celula_pdf("Observação", estilo_cabecalho_tabela),
+                _celula_pdf("Colaborador", estilo_cabecalho_tabela)
+            ]
         ]
         for registro in registros:
             dados.append([
-                registro[0],
-                registro[1] or "",
-                registro[2] or "",
-                registro[3] or "",
-                registro[4] or ""
+                _celula_pdf(registro[0], estilo_celula_tabela),
+                _celula_pdf(registro[1] or "", estilo_celula_tabela),
+                _celula_pdf(registro[2] or "", estilo_celula_tabela),
+                _celula_pdf(registro[3] or "", estilo_celula_tabela),
+                _celula_pdf(registro[4] or "", estilo_celula_tabela)
             ])
         tabela = Table(
-         dados,
-         colWidths=[64, 50, 50, 230, 126],
-         rowHeights=18
+            dados,
+            colWidths=[64, 50, 50, 230, 126],
+            repeatRows=1
         )
         tabela.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ]))
         elementos.append(tabela)
         doc.build(elementos)
@@ -1870,20 +1903,43 @@ def gerar_pdf():
             )
         )
         elementos.append(Spacer(1, 12))
+        estilo_celula_tabela = ParagraphStyle(
+            name='CelulaTabelaPDF',
+            parent=estilos['Normal'],
+            fontSize=8,
+            leading=10,
+            wordWrap='CJK'
+        )
+        estilo_cabecalho_tabela = ParagraphStyle(
+            name='CabecalhoTabelaPDF',
+            parent=estilos['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=8,
+            leading=10,
+            alignment=1,
+            wordWrap='CJK'
+        )
+
         dados = [
-            ["Data", "Entrada", "Saída", "Observação"]
+            [
+                _celula_pdf("Data", estilo_cabecalho_tabela),
+                _celula_pdf("Entrada", estilo_cabecalho_tabela),
+                _celula_pdf("Saída", estilo_cabecalho_tabela),
+                _celula_pdf("Observação", estilo_cabecalho_tabela)
+            ]
         ]
         for registro in registros:
             dados.append([
-                registro[0],
-                registro[1] or "",
-                registro[2] or "",
-                registro[3] or ""
+                _celula_pdf(registro[0], estilo_celula_tabela),
+                _celula_pdf(registro[1] or "", estilo_celula_tabela),
+                _celula_pdf(registro[2] or "", estilo_celula_tabela),
+                _celula_pdf(registro[3] or "", estilo_celula_tabela)
             ])
         tabela = Table(
             dados,
-            colWidths=[78, 58, 58, 310],
-            hAlign='CENTER'
+            colWidths=[78, 58, 58, 120],
+            hAlign='CENTER',
+            repeatRows=1
         )
         tabela.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
@@ -1894,7 +1950,7 @@ def gerar_pdf():
             ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ]))
         elementos.append(tabela)
         elementos.append(Spacer(1, 20))
@@ -2120,6 +2176,13 @@ def gerar_excel():
             arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.xlsx"
         else:
             arquivo = f"Folha_Frequencia_{nome_colaborador}.xlsx"
+
+    for row in ws.iter_rows():
+        for cell in row:
+            cell.alignment = Alignment(
+                wrap_text=True,
+                vertical='top'
+            )
 
     temp_path = save_temp_file('.xlsx')
     wb.save(temp_path)
