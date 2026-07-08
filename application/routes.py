@@ -222,37 +222,37 @@ def salvar_gestor():
     if 'administrador_id' not in session:
         return redirect('/login-administrador')
 
-    with db_cursor(commit=True) as cursor:
-        nome = request.form.get('nome', '')
+    nome = request.form.get('nome', '')
     nucleo = request.form.get('nucleo', '')
     unidade_exercicio = request.form.get('unidade_exercicio', '')
     celular = request.form.get('celular', '')
     login = request.form.get('login', '')
 
     try:
-        cursor.execute("""
-            INSERT INTO gestores (
+        with db_cursor(commit=True) as cursor:
+            cursor.execute("""
+                INSERT INTO gestores (
+                    nome,
+                    nucleo,
+                    unidade_exercicio,
+                    celular,
+                    login,
+                    senha
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
                 nome,
                 nucleo,
                 unidade_exercicio,
                 celular,
                 login,
-                senha
+                "Novocolab123"
+            ))
+            _registrar_log(
+                cursor,
+                'Cadastro de gestor',
+                f"{session.get('nome_admin', 'Administrador')} cadastrou o gestor {nome}."
             )
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            nome,
-            nucleo,
-            unidade_exercicio,
-            celular,
-            login,
-            "Novocolab123"
-        ))
-        _registrar_log(
-            cursor,
-            'Cadastro de gestor',
-            f"{session.get('nome_admin', 'Administrador')} cadastrou o gestor {nome}."
-        )
 
         return redirect('/gestores-cadastrados')
     except Exception as e:
