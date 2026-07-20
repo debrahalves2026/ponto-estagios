@@ -4,6 +4,14 @@
 
 <h1>Lançamento Manual de Ponto</h1>
 
+{% if erro %}
+<p class="alert alert-error">{{ erro }}</p>
+{% endif %}
+
+{% if sucesso %}
+<p class="alert alert-success">{{ sucesso }}</p>
+{% endif %}
+
 <form action="/salvar-lancamento-ponto" method="POST">
 
     <label>Núcleo</label>
@@ -12,28 +20,9 @@
 
     <select id="nucleo-select" required>
         <option value="">Selecione o Núcleo</option>
-        <option>Assistência de Arbitragens</option>
-        <option>Coordenadoria de Execuções Contra a Fazenda Pública (CEFAP)</option>
-        <option>Grupo Especial de Atuação do Contencioso Geral (GEAC)</option>
-        <option>Núcleo Ambiental (NA)</option>
-        <option>Núcleo de Contencioso PGE DETRAN</option>
-        <option>Núcleo de Gestão e Prevenção de Demandas Repetitivas (GPDR)</option>
-        <option>Núcleo de Pessoal Carreiras de Estado (NPCE)</option>
-        <option>Núcleo de Pessoal Educação (NPE)</option>
-        <option>Núcleo de Pessoal Militar (NPM)</option>
-        <option>Núcleo de Pessoal Residual (NPR)</option>
-        <option>Núcleo de Poder de Polícia (NPP)</option>
-        <option>Núcleo de Políticas Públicas (NPPublicas)</option>
-        <option>Núcleo de Propositura de Ações (NPA)</option>
-        <option>Núcleo de Regulações e Contratações Públicas (NRCP)</option>
-        <option>Núcleo de Responsabilidade Civil (NRC)</option>
-        <option>Núcleo de Saúde Pública (NSP)</option>
-        <option>Núcleo Estratégico de Pessoal e Previdenciário (NEPP)</option>
-        <option>Núcleo Imobiliário (NI)</option>
-        <option>Núcleo Previdenciário (SPPREV)</option>
-        <option>Núcleo Responsabilidade Subsidiária de Serviços Terceirizados (NRST)</option>
-        <option>Procuradoria do Estado de São Paulo em Brasília (PESPB)</option>
-        <option>SubCG</option>
+        {% for nucleo in nucleos %}
+        <option value="{{ nucleo }}">{{ nucleo }}</option>
+        {% endfor %}
     </select>
 
     <br><br>
@@ -110,8 +99,16 @@
     const colaboradorSelect = document.getElementById('colaborador-select');
     const colaboradorOptions = Array.from(colaboradorSelect.querySelectorAll('option'));
 
+    function normalizarNucleo(valor) {
+        return (valor || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim()
+            .toLowerCase();
+    }
+
     nucleoSelect.addEventListener('change', () => {
-        const selectedNucleo = nucleoSelect.value;
+        const selectedNucleo = normalizarNucleo(nucleoSelect.value);
         colaboradorSelect.innerHTML = '<option value="">Selecione o Colaborador</option>';
 
         if (!selectedNucleo) {
@@ -120,7 +117,7 @@
         }
 
         const filtered = colaboradorOptions.filter(option => {
-            return option.dataset.nucleo === selectedNucleo;
+            return normalizarNucleo(option.dataset.nucleo) === selectedNucleo;
         });
 
         filtered.forEach(option => {

@@ -4,6 +4,10 @@
 
 <h1>Relatórios</h1>
 
+{% if erro %}
+<p class="alert alert-error">{{ erro }}</p>
+{% endif %}
+
 <hr>
 
 <form method="POST" action="/visualizar-relatorio">
@@ -91,17 +95,19 @@
 
 <br>
 
-<a href="/gerar-excel?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
-    <button type="button">
-        Baixar Excel
-    </button>
-</a>
+<div class="inline-actions">
+    <a href="/gerar-excel?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
+        <button type="button">
+            Baixar Excel
+        </button>
+    </a>
 
-<a href="/gerar-pdf?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
-    <button type="button">
-        Baixar PDF
-    </button>
-</a>
+    <a href="/gerar-pdf?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
+        <button type="button">
+            Baixar PDF
+        </button>
+    </a>
+</div>
 
 {% else %}
 

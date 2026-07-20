@@ -10,6 +10,27 @@
 
 <hr>
 
+<form method="GET" action="/logs" class="toolbar-form">
+    <label for="acao">Filtrar ação:</label>
+    <select id="acao" name="acao">
+        <option value="">Todas as ações</option>
+        {% for acao in acoes %}
+        <option value="{{ acao }}" {% if acao_filtro == acao %}selected{% endif %}>{{ acao }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="texto">Buscar texto:</label>
+    <input id="texto" type="text" name="texto" value="{{ texto_filtro }}" placeholder="Usuário, ação ou detalhe">
+
+    <button type="submit">Filtrar</button>
+
+    {% if acao_filtro or texto_filtro %}
+    <a href="/logs"><button type="button">Limpar</button></a>
+    {% endif %}
+</form>
+
+<br>
+
 <div style="overflow-x:auto;">
     <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse; background:#fff;">
         <thead>

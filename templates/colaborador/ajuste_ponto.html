@@ -4,6 +4,14 @@
 
 <h1>Solicitação de Ajuste de Ponto</h1>
 
+{% if erro %}
+<p class="alert alert-error">{{ erro }}</p>
+{% endif %}
+
+{% if sucesso %}
+<p class="alert alert-success">{{ sucesso }}</p>
+{% endif %}
+
 <form method="POST" action="/enviar-ajuste">
 
     <label>Data do Ajuste</label>
@@ -12,6 +20,7 @@
 
     <input
         type="date"
+        id="data-ajuste"
         name="data"
         value="{{ data_atual }}"
         required>
@@ -88,5 +97,49 @@
     </button>
 
 </a>
+
+<script>
+    const inputDataAjuste = document.getElementById('data-ajuste');
+    const formAjuste = document.querySelector('form[action="/enviar-ajuste"]');
+    const datasFeriado = new Set({{ datas_feriado | default([], true) | tojson }});
+
+    function ehFimDeSemana(dataIso) {
+        const [ano, mes, dia] = dataIso.split('-').map(Number);
+        const data = new Date(ano, mes - 1, dia);
+        const diaSemana = data.getDay();
+        return diaSemana === 0 || diaSemana === 6;
+    }
+
+    function validarDataAjuste() {
+        const valor = inputDataAjuste.value;
+        if (!valor) {
+            return true;
+        }
+
+        if (ehFimDeSemana(valor)) {
+            alert('Não é permitido solicitar ajuste para finais de semana.');
+            inputDataAjuste.value = '';
+            inputDataAjuste.focus();
+            return false;
+        }
+
+        if (datasFeriado.has(valor)) {
+            alert('Não é permitido solicitar ajuste para feriados.');
+            inputDataAjuste.value = '';
+            inputDataAjuste.focus();
+            return false;
+        }
+
+        return true;
+    }
+
+    inputDataAjuste.addEventListener('change', validarDataAjuste);
+
+    formAjuste.addEventListener('submit', function (event) {
+        if (!validarDataAjuste()) {
+            event.preventDefault();
+        }
+    });
+</script>
 
 {% endblock %}

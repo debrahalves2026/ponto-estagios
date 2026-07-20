@@ -12,6 +12,8 @@
         <th>Colaborador</th>
         <th>Núcleo</th>
         <th>Data</th>
+        <th>Tipo</th>
+        <th>Horário correto</th>
         <th>Motivo</th>
         <th>Status</th>
         <th>Ações</th>
@@ -29,23 +31,27 @@
 
         <td>{{ ajuste[4] }}</td>
 
+        <td>{{ ajuste[5] }}</td>
+
+        <td>{{ ajuste[6] }}</td>
+
         <td>
 
-            {% if ajuste[5] == 'Pendente' %}
+            {% if ajuste[7] == 'Pendente' %}
 
-                <span style="color:orange;">
+                <span class="status-pill pending">
                     ● Pendente
                 </span>
 
-            {% elif ajuste[5] == 'Aprovado' %}
+            {% elif ajuste[7] == 'Aprovado' %}
 
-                <span style="color:green;">
+                <span class="status-pill approved">
                     ● Aprovado
                 </span>
 
             {% else %}
 
-                <span style="color:red;">
+                <span class="status-pill rejected">
                     ● Reprovado
                 </span>
 
@@ -53,9 +59,11 @@
 
         </td>
 
-        <td>
+        <td class="table-actions">
 
-            {% if ajuste[5] == 'Pendente' %}
+            {% if ajuste[7] == 'Pendente' %}
+
+            <div class="inline-actions">
 
             <a href="/aprovar-ajuste/{{ ajuste[0] }}">
                 <button>
@@ -63,15 +71,22 @@
                 </button>
             </a>
 
-            <a href="/reprovar-ajuste/{{ ajuste[0] }}">
-                <button>
-                    Reprovar
-                </button>
-            </a>
+            <form action="/reprovar-ajuste/{{ ajuste[0] }}" method="POST">
+                <input type="text" name="motivo_reprovacao" placeholder="Motivo da reprovação" required style="max-width:220px;">
+                <button type="submit">Reprovar</button>
+            </form>
+
+            </div>
 
             {% else %}
 
-                Finalizado
+                {% if ajuste[7] == 'Reprovado' and ajuste[8] %}
+                    Reprovado por {{ ajuste[9] or 'Gestão' }}: {{ ajuste[8] }}
+                {% elif ajuste[7] == 'Aprovado' %}
+                    Aprovado por {{ ajuste[9] or 'Gestão' }}
+                {% else %}
+                    Finalizado
+                {% endif %}
 
             {% endif %}
 

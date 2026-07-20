@@ -4,6 +4,10 @@
 
 <h1>Solicitações de Ajuste de Ponto</h1>
 
+{% if erro %}
+<p class="alert alert-error">{{ erro }}</p>
+{% endif %}
+
 <hr>
 
 <table border="1" cellpadding="10">
@@ -12,6 +16,8 @@
         <th>Colaborador</th>
         <th>Núcleo</th>
         <th>Data</th>
+        <th>Tipo</th>
+        <th>Horário correto</th>
         <th>Motivo</th>
         <th>Status</th>
         <th>Ações</th>
@@ -25,21 +31,40 @@
         <td>{{ ajuste[2] }}</td>
         <td>{{ ajuste[3] }}</td>
         <td>{{ ajuste[4] }}</td>
+        <td>{{ ajuste[5] }}</td>
+        <td>{{ ajuste[6] }}</td>
         <td>
-            {% if ajuste[5] == 'Pendente' %}
-                <span style="color:orange;">● Pendente</span>
-            {% elif ajuste[5] == 'Aprovado' %}
-                <span style="color:green;">● Aprovado</span>
+            {% if ajuste[7] == 'Pendente' %}
+                <span class="status-pill pending">● Pendente</span>
+            {% elif ajuste[7] == 'Aprovado' %}
+                <span class="status-pill approved">● Aprovado</span>
             {% else %}
-                <span style="color:red;">● Reprovado</span>
+                <span class="status-pill rejected">● Reprovado</span>
             {% endif %}
         </td>
-        <td>
-            {% if ajuste[5] == 'Pendente' %}
+        <td class="table-actions">
+            {% if ajuste[7] == 'Pendente' %}
+            <div class="inline-actions">
             <a href="/aprovar-ajuste/{{ ajuste[0] }}"><button>Aprovar</button></a>
-            <a href="/reprovar-ajuste/{{ ajuste[0] }}"><button>Reprovar</button></a>
+            <form action="/reprovar-ajuste/{{ ajuste[0] }}" method="POST">
+                <textarea
+                    name="motivo_reprovacao"
+                    rows="2"
+                    placeholder="Motivo da reprovação"
+                    required
+                    class="small-textarea"></textarea>
+                <br>
+                <button type="submit">Reprovar</button>
+            </form>
+            </div>
             {% else %}
-                Finalizado
+                {% if ajuste[7] == 'Reprovado' and ajuste[8] %}
+                    Reprovado por {{ ajuste[9] or 'Gestão' }}: {{ ajuste[8] }}
+                {% elif ajuste[7] == 'Aprovado' %}
+                    Aprovado por {{ ajuste[9] or 'Gestão' }}
+                {% else %}
+                    Finalizado
+                {% endif %}
             {% endif %}
         </td>
 

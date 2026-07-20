@@ -10,6 +10,18 @@
 
 <h2 id="relogio">--:--:--</h2>
 
+{% if erro %}
+<p class="alert alert-error">{{ erro }}</p>
+{% endif %}
+
+{% if sucesso %}
+<p class="alert alert-success">{{ sucesso }}</p>
+{% endif %}
+
+{% if bloqueio_hoje %}
+<p class="alert alert-warning">{{ bloqueio_hoje }}</p>
+{% endif %}
+
 <hr>
 
 <h2>Registros de Hoje</h2>
@@ -48,9 +60,9 @@
         type="time"
         name="entrada"
         required
-        {% if entrada_registrada %}disabled{% endif %}>
+        {% if entrada_registrada or bloqueio_hoje %}disabled{% endif %}>
 
-    <button type="submit" {% if entrada_registrada %}disabled{% endif %}>
+    <button type="submit" {% if entrada_registrada or bloqueio_hoje %}disabled{% endif %}>
 
         Salvar Entrada
 
@@ -70,9 +82,9 @@
         type="time"
         name="saida_final"
         required
-        {% if saida_registrada %}disabled{% endif %}>
+        {% if saida_registrada or bloqueio_hoje %}disabled{% endif %}>
 
-    <button type="submit" {% if saida_registrada %}disabled{% endif %}>
+    <button type="submit" {% if saida_registrada or bloqueio_hoje %}disabled{% endif %}>
 
         Salvar Saída
 

@@ -4,29 +4,19 @@
 
 <h1>Colaboradores Cadastrados</h1>
 
-<style>
-    .colaboradores-table button {
-        display: block;
-        width: 150px;
-        margin: 4px 0;
-    }
-    .colaboradores-table a,
-    .colaboradores-table form {
-        display: inline-block;
-        vertical-align: top;
-    }
-    .colaboradores-table .cancel-colaborador-form {
-        max-width: 100%;
-    }
-    .colaboradores-table .cancel-motivo-container {
-        display: none;
-        margin-top: 8px;
-    }
-</style>
-
-<input
-    type="text"
-    placeholder="Pesquisar colaborador">
+<form method="GET" action="/colaboradores-cadastrados" class="toolbar-form">
+    <label for="filtro-nucleo">Filtrar por núcleo:</label>
+    <select id="filtro-nucleo" name="nucleo">
+        <option value="">Todos os núcleos</option>
+        {% for nucleo in nucleos %}
+        <option value="{{ nucleo }}" {% if nucleo_filtro == nucleo %}selected{% endif %}>{{ nucleo }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Filtrar</button>
+    {% if nucleo_filtro %}
+    <a href="/colaboradores-cadastrados"><button type="button">Limpar filtro</button></a>
+    {% endif %}
+</form>
 
 <br><br>
 
@@ -55,13 +45,13 @@
 
             {% if colaborador[12] == 'Ativo' %}
 
-                <span style="color:green;">
+                <span class="status-pill approved">
                     ● Ativo
                 </span>
 
             {% else %}
 
-                <span style="color:red;">
+                <span class="status-pill rejected">
                     ● Inativo
                 </span>
 
@@ -71,7 +61,9 @@
 
         <td>{{ colaborador[13] or '—' }}</td>
 
-        <td>
+        <td class="table-actions">
+
+            <div class="inline-actions">
 
             <a href="/editar-colaborador/{{ colaborador[0] }}">
                 <button>Editar</button>
@@ -89,16 +81,16 @@
             {% if colaborador[12] == 'Ativo' %}
 
             <form method="POST" action="/cancelar-colaborador/{{ colaborador[0] }}" class="cancel-colaborador-form">
-                <button type="button" class="show-cancel-motivo" data-colaborador-id="{{ colaborador[0] }}" style="margin-top:4px;">
+                <button type="button" class="show-cancel-motivo" data-colaborador-id="{{ colaborador[0] }}">
                     Inativar
                 </button>
 
-                <div class="cancel-motivo-container" id="cancel-motivo-{{ colaborador[0] }}">
+                <div class="cancel-motivo-container" id="cancel-motivo-{{ colaborador[0] }}" style="display:none; margin-top:8px;">
                     <div style="margin-top:8px; margin-bottom:6px;">
-                        <label for="motivo-{{ colaborador[0] }}" style="display:block; font-size:0.9rem; margin-bottom:4px;">Motivo do cancelamento</label>
-                        <textarea name="motivo_cancelamento" id="motivo-{{ colaborador[0] }}" rows="2" style="width:100%; max-width:260px; padding:8px; font-size:0.9rem;" required></textarea>
+                        <label for="motivo-{{ colaborador[0] }}" style="display:block; margin-bottom:4px;">Motivo do cancelamento</label>
+                        <textarea name="motivo_cancelamento" id="motivo-{{ colaborador[0] }}" rows="2" class="small-textarea" required></textarea>
                     </div>
-                    <button type="submit" onclick="return confirm('Deseja inativar este colaborador?');" style="margin-top:4px;">
+                    <button type="submit" onclick="return confirm('Deseja inativar este colaborador?');">
                         Confirmar Inativação
                     </button>
                 </div>
@@ -106,11 +98,13 @@
 
             {% else %}
 
-            <form method="POST" action="/recadastrar-colaborador/{{ colaborador[0] }}" style="display:inline;">
+            <form method="POST" action="/recadastrar-colaborador/{{ colaborador[0] }}">
                 <button type="submit">Recadastro</button>
             </form>
 
             {% endif %}
+
+            </div>
 
         </td>
 

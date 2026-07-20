@@ -4,6 +4,10 @@
 
 <h1>Relatórios</h1>
 
+{% if erro %}
+<p class="alert alert-error">{{ erro }}</p>
+{% endif %}
+
 <hr>
 
 <form method="POST" action="/visualizar-relatorio">
@@ -15,6 +19,8 @@
     <select name="colaborador_id" required>
 
         <option value="">Selecionar Colaborador</option>
+
+        <option value="all" {% if colaborador_id == 'all' %}selected{% endif %}>Todos os colaboradores do núcleo</option>
 
         {% for colaborador in colaboradores %}
 
@@ -68,12 +74,14 @@
 
 <br>
 
-<a href="/gerar-excel?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
-    <button type="button">Baixar Excel</button>
-</a>
-<a href="/gerar-pdf?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
-    <button type="button">Baixar PDF</button>
-</a>
+<div class="inline-actions">
+    <a href="/gerar-excel?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
+        <button type="button">Baixar Excel</button>
+    </a>
+    <a href="/gerar-pdf?colaborador_id={{ colaborador_id }}&mes={{ mes }}">
+        <button type="button">Baixar PDF</button>
+    </a>
+</div>
 
 {% else %}
 
@@ -97,10 +105,39 @@
     {% endfor %}
 </table>
 <br>
-<a href="/download-folhas-assinadas">
-    <button type="button" {% if not todos_anexados %}disabled{% endif %} title="{% if not todos_anexados %}Todos os colaboradores precisam ter a folha anexada{% else %}Baixar pacote{% endif %}">Baixar pacote em PDF</button>
-</a>
+<form method="GET" action="/download-folha-assinada/0" id="download-individual-form" class="toolbar-form">
+    <label for="colaborador-download">Baixar folha assinada individual</label>
+    <select id="colaborador-download" required>
+        <option value="">Selecione um colaborador</option>
+        {% for item in status_folhas %}
+        <option value="{{ item.id }}" {% if not item.anexado %}disabled{% endif %}>{{ item.nome }} {% if not item.anexado %}(sem anexo){% endif %}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Baixar folha</button>
+</form>
+
+<div class="inline-actions">
+    <a href="/download-folhas-assinadas">
+        <button type="button">Baixar pacote de folhas assinadas</button>
+    </a>
+</div>
 <br><br>
 {% endif %}
+
+<script>
+    const formDownload = document.getElementById('download-individual-form');
+    const selectDownload = document.getElementById('colaborador-download');
+
+    if (formDownload && selectDownload) {
+        formDownload.addEventListener('submit', function (event) {
+            event.preventDefault();
+            const id = selectDownload.value;
+            if (!id) {
+                return;
+            }
+            window.location.href = '/download-folha-assinada/' + id;
+        });
+    }
+</script>
 
 {% endblock %}

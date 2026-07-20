@@ -5,10 +5,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
 from zipfile import ZipFile
+from urllib.parse import quote_plus
 import os
 import re
 import tempfile
@@ -65,6 +66,186 @@ def _registrar_log(cursor, acao, detalhes):
         acao,
         detalhes
     ))
+
+
+def _agora_sp():
+    return datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+
+def _data_iso_para_br(data_iso):
+    try:
+        return datetime.strptime(data_iso, '%Y-%m-%d').strftime('%d/%m/%Y')
+    except (ValueError, TypeError):
+        return data_iso
+
+
+def _data_br_para_date(data_br):
+    return datetime.strptime(data_br, '%d/%m/%Y').date()
+
+
+def _eh_fim_de_semana(data_br):
+    return _data_br_para_date(data_br).weekday() >= 5
+
+
+def _nome_reprovador():
+    return session.get('nome_admin') or session.get('nome_gestor', 'Usuário')
+
+
+def _mensagem_query(param):
+    return request.args.get(param, '').strip()
+
+
+def _redirect_com_mensagem(path, chave, mensagem):
+    return redirect(f"{path}?{chave}={quote_plus(mensagem)}")
+
+
+def _colaborador_nucleo(cursor, colaborador_id):
+    cursor.execute("""
+        SELECT nome, nucleo
+        FROM colaboradores
+        WHERE id = ?
+    """, (colaborador_id,))
+    return cursor.fetchone()
+
+
+def _eh_feriado(cursor, data_br, nucleo):
+    cursor.execute("""
+        SELECT 1
+        FROM eventos
+        WHERE data = ?
+        AND lower(trim(tipo)) = 'feriado'
+        AND (nucleo = ? OR nucleo IS NULL OR trim(nucleo) = '')
+        LIMIT 1
+    """, (
+        data_br,
+        nucleo
+    ))
+    return cursor.fetchone() is not None
+
+
+def _datas_feriado_nucleo(cursor, nucleo):
+    cursor.execute("""
+        SELECT data
+        FROM eventos
+        WHERE lower(trim(tipo)) = 'feriado'
+        AND (nucleo = ? OR nucleo IS NULL OR trim(nucleo) = '')
+    """, (nucleo,))
+
+    datas_iso = []
+    for row in cursor.fetchall():
+        data_br = (row[0] or '').strip()
+        try:
+            datas_iso.append(datetime.strptime(data_br, '%d/%m/%Y').strftime('%Y-%m-%d'))
+        except ValueError:
+            continue
+
+    return sorted(set(datas_iso))
+
+
+def _bloqueio_trabalho(cursor, data_br, nucleo):
+    if _eh_fim_de_semana(data_br):
+        return 'Não é permitido registrar ou solicitar ajuste para finais de semana.'
+    if _eh_feriado(cursor, data_br, nucleo):
+        return 'Não é permitido registrar ou solicitar ajuste para feriados.'
+    return None
+
+
+def _proximo_dia_util(cursor, nucleo, data_inicial=None):
+    data_atual = data_inicial or _agora_sp().date()
+
+    for _ in range(370):
+        data_br = data_atual.strftime('%d/%m/%Y')
+        if not _bloqueio_trabalho(cursor, data_br, nucleo):
+            return data_atual
+        data_atual += timedelta(days=1)
+
+    return data_inicial or _agora_sp().date()
+
+
+def _registros_folha_colaborador(cursor, colaborador_id, mes=None, ano=None, ordem='desc'):
+    cursor.execute("""
+        SELECT nucleo
+        FROM colaboradores
+        WHERE id = ?
+    """, (colaborador_id,))
+    colaborador = cursor.fetchone()
+    nucleo = (colaborador[0] if colaborador else '') or ''
+
+    filtro_periodo = ''
+    parametros_registros = [colaborador_id]
+    parametros_eventos = [nucleo]
+
+    if mes and ano:
+        filtro_periodo = " AND substr(data,4,2) = ? AND substr(data,7,4) = ?"
+        parametros_registros.extend([mes, ano])
+        parametros_eventos.extend([mes, ano])
+
+    cursor.execute(f"""
+        SELECT
+            data,
+            entrada,
+            saida_final,
+            observacao
+        FROM registros_ponto
+        WHERE colaborador_id = ?
+        {filtro_periodo}
+    """, parametros_registros)
+    registros = cursor.fetchall()
+
+    cursor.execute(f"""
+        SELECT
+            data,
+            group_concat(tipo || ' - ' || titulo, '; ') AS eventos_obs
+        FROM eventos
+        WHERE (nucleo = ? OR nucleo IS NULL OR trim(nucleo) = '')
+        {filtro_periodo}
+        GROUP BY data
+    """, parametros_eventos)
+    eventos = cursor.fetchall()
+
+    itens_por_data = {}
+    for data, entrada, saida_final, observacao in registros:
+        itens_por_data[data] = {
+            'data': data,
+            'entrada': entrada,
+            'saida_final': saida_final,
+            'observacao': observacao
+        }
+
+    for data, eventos_obs in eventos:
+        item = itens_por_data.get(data)
+        if item:
+            if not (item['observacao'] or '').strip():
+                item['observacao'] = eventos_obs
+        else:
+            itens_por_data[data] = {
+                'data': data,
+                'entrada': None,
+                'saida_final': None,
+                'observacao': eventos_obs
+            }
+
+    def _chave_ordenacao(item):
+        try:
+            return _data_br_para_date(item['data'])
+        except (ValueError, TypeError):
+            return datetime.min.date()
+
+    registros_ordenados = sorted(
+        itens_por_data.values(),
+        key=_chave_ordenacao,
+        reverse=(ordem != 'asc')
+    )
+
+    return [
+        (
+            item['data'],
+            item['entrada'],
+            item['saida_final'],
+            item['observacao']
+        )
+        for item in registros_ordenados
+    ]
 
 @main_bp.route('/')
 def inicio():
@@ -531,38 +712,54 @@ def dashboard_administrador():
 
 @main_bp.route('/colaboradores-cadastrados')
 def colaboradores_cadastrados():
+    nucleo_filtro = request.args.get('nucleo', '').strip()
 
     with db_cursor() as cursor:
-        # Administrador vê todos os colaboradores
         if 'administrador_id' in session:
             cursor.execute("""
-                SELECT *
+                SELECT DISTINCT nucleo
                 FROM colaboradores
-                ORDER BY nome
+                WHERE trim(COALESCE(nucleo, '')) != ''
+                ORDER BY nucleo
             """)
-        elif 'gestor_id' in session:
+            nucleos = [row[0] for row in cursor.fetchall()]
+
+            if nucleo_filtro:
+                cursor.execute("""
+                    SELECT *
+                    FROM colaboradores
+                    WHERE nucleo = ?
+                    ORDER BY nome
+                """, (nucleo_filtro,))
+            else:
+                cursor.execute("""
+                    SELECT *
+                    FROM colaboradores
+                    ORDER BY nome
+                """)
+
+            colaboradores = cursor.fetchall()
+            return render_template(
+                'administrador/colaboradores.html',
+                colaboradores=colaboradores,
+                nucleos=nucleos,
+                nucleo_filtro=nucleo_filtro
+            )
+
+        if 'gestor_id' in session:
             cursor.execute("""
                 SELECT *
                 FROM colaboradores
                 WHERE nucleo = ?
                 ORDER BY nome
-            """, (
-                session['nucleo_gestor'],
-            ))
-        else:
-            return redirect('/login-administrador')
+            """, (session['nucleo_gestor'],))
+            colaboradores = cursor.fetchall()
+            return render_template(
+                'gestor_nucleo/colaboradores.html',
+                colaboradores=colaboradores
+            )
 
-    colaboradores = cursor.fetchall()
-    if 'administrador_id' in session:
-        return render_template(
-            'administrador/colaboradores.html',
-            colaboradores=colaboradores
-        )
-
-    return render_template(
-        'gestor_nucleo/colaboradores.html',
-        colaboradores=colaboradores
-    )
+    return redirect('/login-administrador')
 # PONTO
 
 @main_bp.route('/ponto')
@@ -571,25 +768,36 @@ def ponto():
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
+    data_hoje = _agora_sp().strftime('%d/%m/%Y')
+
     with db_cursor() as cursor:
-        data_hoje = datetime.now(
-        ZoneInfo("America/Sao_Paulo")
-    ).strftime('%d/%m/%Y')
+        cursor.execute("""
+            SELECT
+                id,
+                entrada,
+                saida_final
+            FROM registros_ponto
+            WHERE colaborador_id = ?
+            AND data = ?
+        """, (
+            session['colaborador_id'],
+            data_hoje
+        ))
+        registro = cursor.fetchone()
 
-    cursor.execute("""
-        SELECT
-            id,
-            entrada,
-            saida_final
-        FROM registros_ponto
-        WHERE colaborador_id = ?
-        AND data = ?
-    """, (
-        session['colaborador_id'],
-        data_hoje
-    ))
+        cursor.execute("""
+            SELECT nucleo
+            FROM colaboradores
+            WHERE id = ?
+        """, (session['colaborador_id'],))
+        colaborador = cursor.fetchone()
 
-    registro = cursor.fetchone()
+        bloqueio_hoje = _bloqueio_trabalho(
+            cursor,
+            data_hoje,
+            colaborador[0] if colaborador else ''
+        )
+
     entrada = "--:--"
     saida_final = "--:--"
     entrada_registrada = False
@@ -608,24 +816,44 @@ def ponto():
         entrada=entrada,
         saida_final=saida_final,
         entrada_registrada=entrada_registrada,
-        saida_registrada=saida_registrada
+        saida_registrada=saida_registrada,
+        erro=_mensagem_query('erro'),
+        sucesso=_mensagem_query('sucesso'),
+        bloqueio_hoje=bloqueio_hoje
     )
 # AJUSTE DE PONTO
 
 @main_bp.route('/ajuste-ponto')
 def ajuste_ponto():
 
-    # Data atual no formato YYYY-MM-DD para o input type="date"
-    data_atual = datetime.now().strftime('%Y-%m-%d')
+    if 'colaborador_id' not in session:
+        return redirect('/login-colaborador')
+
+    with db_cursor() as cursor:
+        cursor.execute("""
+            SELECT nucleo
+            FROM colaboradores
+            WHERE id = ?
+        """, (session['colaborador_id'],))
+        colaborador = cursor.fetchone()
+        nucleo = colaborador[0] if colaborador else ''
+        data_atual = _proximo_dia_util(cursor, nucleo).strftime('%Y-%m-%d')
+        datas_feriado = _datas_feriado_nucleo(cursor, nucleo)
     
     return render_template(
         'colaborador/ajuste_ponto.html',
-        data_atual=data_atual
+        data_atual=data_atual,
+        datas_feriado=datas_feriado,
+        erro=_mensagem_query('erro'),
+        sucesso=_mensagem_query('sucesso')
     )
 # SOLICITAÇÕES DE AJUSTE
 
 @main_bp.route('/solicitacoes-ajuste')
 def solicitacoes_ajuste():
+
+    if 'administrador_id' not in session and 'gestor_id' not in session:
+        return redirect('/login-gestor-nucleo')
 
     with db_cursor() as cursor:
         # Administrador vê todos
@@ -637,8 +865,12 @@ def solicitacoes_ajuste():
                     colaboradores.nome,
                     colaboradores.nucleo,
                     ajustes_ponto.data,
+                    ajustes_ponto.tipo_ajuste,
+                    ajustes_ponto.horario_correto,
                     ajustes_ponto.motivo,
-                    ajustes_ponto.status
+                    ajustes_ponto.status,
+                    ajustes_ponto.motivo_reprovacao,
+                    ajustes_ponto.analisado_por
                 FROM ajustes_ponto
                 INNER JOIN colaboradores
                 ON ajustes_ponto.colaborador_id = colaboradores.id
@@ -654,8 +886,12 @@ def solicitacoes_ajuste():
                     colaboradores.nome,
                     colaboradores.nucleo,
                     ajustes_ponto.data,
+                    ajustes_ponto.tipo_ajuste,
+                    ajustes_ponto.horario_correto,
                     ajustes_ponto.motivo,
-                    ajustes_ponto.status
+                    ajustes_ponto.status,
+                    ajustes_ponto.motivo_reprovacao,
+                    ajustes_ponto.analisado_por
                 FROM ajustes_ponto
                 INNER JOIN colaboradores
                 ON ajustes_ponto.colaborador_id = colaboradores.id
@@ -666,6 +902,7 @@ def solicitacoes_ajuste():
             ))
 
         ajustes = cursor.fetchall()
+    erro=_mensagem_query('erro')
     if 'administrador_id' in session:
         template_name = 'administrador/solicitacoes_ajuste.html'
     elif 'gestor_id' in session:
@@ -675,7 +912,8 @@ def solicitacoes_ajuste():
 
     return render_template(
         template_name,
-        ajustes=ajustes
+        ajustes=ajustes,
+        erro=erro
     )
 # APROVAR AJUSTE
 
@@ -707,20 +945,87 @@ def aprovar_ajuste(id):
             return redirect('/solicitacoes-ajuste')
 
         cursor.execute("""
-            SELECT colaboradores.nome
+            SELECT
+                colaboradores.nome,
+                ajustes_ponto.colaborador_id,
+                ajustes_ponto.data,
+                ajustes_ponto.tipo_ajuste,
+                ajustes_ponto.horario_correto
             FROM ajustes_ponto
             INNER JOIN colaboradores ON colaboradores.id = ajustes_ponto.colaborador_id
             WHERE ajustes_ponto.id = ?
         """, (id,))
         ajuste_info = cursor.fetchone()
+
         if ajuste_info:
             nome_colaborador = ajuste_info[0]
+            colaborador_id = ajuste_info[1]
+            data_ajuste = ajuste_info[2]
+            tipo_ajuste = (ajuste_info[3] or '').strip().lower()
+            horario_correto = (ajuste_info[4] or '').strip()
+
+            cursor.execute("""
+                SELECT id, entrada, saida_final
+                FROM registros_ponto
+                WHERE colaborador_id = ?
+                AND data = ?
+            """, (
+                colaborador_id,
+                data_ajuste
+            ))
+            registro = cursor.fetchone()
+
+            if registro:
+                registro_id, entrada_atual, saida_atual = registro
+                nova_entrada = entrada_atual
+                nova_saida = saida_atual
+
+                if tipo_ajuste == 'entrada':
+                    nova_entrada = horario_correto
+                elif tipo_ajuste in ('saida', 'saída'):
+                    nova_saida = horario_correto
+
+                cursor.execute("""
+                    UPDATE registros_ponto
+                    SET entrada = ?, saida_final = ?
+                    WHERE id = ?
+                """, (
+                    nova_entrada,
+                    nova_saida,
+                    registro_id
+                ))
+            else:
+                entrada = horario_correto if tipo_ajuste == 'entrada' else ''
+                saida_final = horario_correto if tipo_ajuste in ('saida', 'saída') else ''
+
+                cursor.execute("""
+                    INSERT INTO registros_ponto (
+                        colaborador_id,
+                        data,
+                        entrada,
+                        saida_final
+                    )
+                    VALUES (?, ?, ?, ?)
+                """, (
+                    colaborador_id,
+                    data_ajuste,
+                    entrada,
+                    saida_final
+                ))
 
         cursor.execute("""
             UPDATE ajustes_ponto
-            SET status = 'Aprovado'
+            SET
+                status = 'Aprovado',
+                motivo_reprovacao = NULL,
+                analisado_por = ?,
+                data_analise = ?
             WHERE id = ?
-        """, (id,))
+        """, (
+            _nome_reprovador(),
+            _agora_sp().strftime('%d/%m/%Y %H:%M:%S'),
+            id
+        ))
         _registrar_log(
             cursor,
             'Aprovação de ajuste',
@@ -730,8 +1035,14 @@ def aprovar_ajuste(id):
     return redirect('/solicitacoes-ajuste')
 # REPROVAR AJUSTE
 
-@main_bp.route('/reprovar-ajuste/<int:id>')
+@main_bp.route('/reprovar-ajuste/<int:id>', methods=['GET', 'POST'])
 def reprovar_ajuste(id):
+
+    motivo_reprovacao = request.form.get('motivo_reprovacao', '').strip()
+    if not motivo_reprovacao:
+        motivo_reprovacao = request.args.get('motivo', '').strip()
+    if not motivo_reprovacao:
+        motivo_reprovacao = 'Reprovado sem observação informada.'
 
     with db_cursor(commit=True) as cursor:
         nome_colaborador = 'Colaborador'
@@ -767,9 +1078,18 @@ def reprovar_ajuste(id):
 
         cursor.execute("""
             UPDATE ajustes_ponto
-            SET status = 'Reprovado'
+            SET
+                status = 'Reprovado',
+                motivo_reprovacao = ?,
+                analisado_por = ?,
+                data_analise = ?
             WHERE id = ?
-        """, (id,))
+        """, (
+            motivo_reprovacao,
+            _nome_reprovador(),
+            _agora_sp().strftime('%d/%m/%Y %H:%M:%S'),
+            id
+        ))
         _registrar_log(
             cursor,
             'Reprovação de ajuste',
@@ -789,8 +1109,13 @@ def meus_ajustes():
         cursor.execute("""
         SELECT
             data,
+            tipo_ajuste,
+            horario_correto,
             motivo,
-            status
+            status,
+            motivo_reprovacao,
+            analisado_por,
+            data_analise
         FROM ajustes_ponto
         WHERE colaborador_id = ?
         ORDER BY id DESC
@@ -900,14 +1225,14 @@ def apagar_evento():
 def _buscar_status_folhas(cursor, nucleo=None):
     if nucleo is None:
         cursor.execute("""
-            SELECT id, nome, folha_assinada_path
+            SELECT id, nome, folha_assinada_path, folha_assinada_nome
             FROM colaboradores
             WHERE status = 'Ativo'
             ORDER BY nome
         """)
     else:
         cursor.execute("""
-            SELECT id, nome, folha_assinada_path
+            SELECT id, nome, folha_assinada_path, folha_assinada_nome
             FROM colaboradores
             WHERE status = 'Ativo'
             AND nucleo = ?
@@ -918,7 +1243,9 @@ def _buscar_status_folhas(cursor, nucleo=None):
         {
             'id': row[0],
             'nome': row[1],
-            'anexado': bool((row[2] or '').strip())
+            'anexado': bool((row[2] or '').strip()),
+            'arquivo_path': row[2],
+            'arquivo_nome': row[3]
         }
         for row in cursor.fetchall()
     ]
@@ -958,7 +1285,10 @@ def relatorios():
             ))
 
         colaboradores = cursor.fetchall()
-    status_folhas = _buscar_status_folhas(cursor, session.get('nucleo_gestor') if 'gestor_id' in session else None)
+        status_folhas = _buscar_status_folhas(
+            cursor,
+            session.get('nucleo_gestor') if 'gestor_id' in session else None
+        )
     if 'administrador_id' in session:
         template_name = 'administrador/relatorios.html'
     elif 'gestor_id' in session:
@@ -976,7 +1306,8 @@ def relatorios():
         todos=False,
         status_folhas=status_folhas,
         todos_anexados=_todos_folhas_anexadas(status_folhas),
-        mes_atual=mes_atual
+        mes_atual=mes_atual,
+        erro=_mensagem_query('erro')
     )
 
 
@@ -1005,8 +1336,27 @@ def logs_sistema():
     if not session.get('logs_auth_ok'):
         return redirect('/dashboard-administrador?erro_logs=1')
 
+    acao_filtro = request.args.get('acao', '').strip()
+    texto_filtro = request.args.get('texto', '').strip()
+
     with db_cursor() as cursor:
-        cursor.execute("""
+        filtros = []
+        parametros = []
+
+        if acao_filtro:
+            filtros.append("acao = ?")
+            parametros.append(acao_filtro)
+
+        if texto_filtro:
+            termo = f"%{texto_filtro.lower()}%"
+            filtros.append("(lower(nome_usuario) LIKE ? OR lower(acao) LIKE ? OR lower(detalhes) LIKE ?)")
+            parametros.extend([termo, termo, termo])
+
+        where_sql = ''
+        if filtros:
+            where_sql = 'WHERE ' + ' AND '.join(filtros)
+
+        cursor.execute(f"""
             SELECT
                 data_hora,
                 tipo_usuario,
@@ -1014,14 +1364,26 @@ def logs_sistema():
                 acao,
                 detalhes
             FROM logs_sistema
+            {where_sql}
             ORDER BY id DESC
             LIMIT 500
-        """)
+        """, parametros)
         logs = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT DISTINCT acao
+            FROM logs_sistema
+            WHERE trim(COALESCE(acao, '')) != ''
+            ORDER BY acao
+        """)
+        acoes = [row[0] for row in cursor.fetchall()]
 
     return render_template(
         'administrador/logs.html',
-        logs=logs
+        logs=logs,
+        acoes=acoes,
+        acao_filtro=acao_filtro,
+        texto_filtro=texto_filtro
     )
 # VISUALIZAR RELATÓRIO
 
@@ -1035,175 +1397,129 @@ def visualizar_relatorio():
     with db_cursor() as cursor:
         # Lista de colaboradores
         if 'gestor_id' not in session:
-
             cursor.execute("""
                 SELECT id, nome
                 FROM colaboradores
                 WHERE status = 'Ativo'
                 ORDER BY nome
             """)
-
         else:
-
             cursor.execute("""
                 SELECT id, nome
                 FROM colaboradores
                 WHERE status = 'Ativo'
-            AND nucleo = ?
-            ORDER BY nome
-        """, (
-            session['nucleo_gestor'],
-        ))
+                AND nucleo = ?
+                ORDER BY nome
+            """, (session['nucleo_gestor'],))
 
-    colaboradores = cursor.fetchall()
-    status_folhas = _buscar_status_folhas(cursor, session.get('nucleo_gestor') if 'gestor_id' in session else None)
+        colaboradores = cursor.fetchall()
+        status_folhas = _buscar_status_folhas(
+            cursor,
+            session.get('nucleo_gestor') if 'gestor_id' in session else None
+        )
 
-    # Segurança adicional para Gestor do Núcleo
-    if 'gestor_id' in session:
+        # Segurança adicional para Gestor do Núcleo
+        if 'gestor_id' in session and colaborador_id != 'all':
+            cursor.execute("""
+                SELECT id
+                FROM colaboradores
+                WHERE id = ?
+                AND nucleo = ?
+            """, (
+                colaborador_id,
+                session['nucleo_gestor']
+            ))
+            permissao = cursor.fetchone()
 
-        if colaborador_id == 'all':
-            return render_template(
-                'gestor_nucleo/relatorios.html',
-                colaboradores=colaboradores,
-                registros=None,
-                erro='Opção inválida.',
-                mes=mes,
-                todos=False,
-                status_folhas=status_folhas,
-                todos_anexados=_todos_folhas_anexadas(status_folhas)
-            )
+            if not permissao:
+                return render_template(
+                    'gestor_nucleo/relatorios.html',
+                    colaboradores=colaboradores,
+                    registros=None,
+                    erro='Você não possui permissão para visualizar este colaborador.',
+                    mes=mes,
+                    todos=False,
+                    status_folhas=status_folhas,
+                    todos_anexados=_todos_folhas_anexadas(status_folhas)
+                )
 
-        cursor.execute("""
-            SELECT id
-            FROM colaboradores
-            WHERE id = ?
-            AND nucleo = ?
-        """, (
-            colaborador_id,
-            session['nucleo_gestor']
-        ))
-
-        permissao = cursor.fetchone()
-
-        if not permissao:
-            return render_template(
-                'gestor_nucleo/relatorios.html',
-                colaboradores=colaboradores,
-                registros=None,
-                erro='Você não possui permissão para visualizar este colaborador.',
-                mes=mes,
-                todos=False,
-                status_folhas=status_folhas,
-                todos_anexados=_todos_folhas_anexadas(status_folhas)
-            )
-
-    # Busca os registros — filtra por mês/ano se fornecido
-    if mes:
-        # campo <input type="month"> envia 'YYYY-MM'
-        try:
-            ano, mes_num = mes.split('-')
-        except ValueError:
+        # Busca os registros — filtra por mês/ano se fornecido
+        if mes:
+            try:
+                ano, mes_num = mes.split('-')
+            except ValueError:
+                ano = None
+                mes_num = None
+        else:
             ano = None
             mes_num = None
 
-    else:
-        ano = None
-        mes_num = None
+        if colaborador_id == 'all':
+            if 'administrador_id' in session:
+                filtro_todos = ""
+                parametros = []
+            elif 'gestor_id' in session:
+                filtro_todos = " AND colaboradores.nucleo = ?"
+                parametros = [session['nucleo_gestor']]
+            else:
+                return redirect('/login-administrador')
 
-    if colaborador_id == 'all':
-        if 'administrador_id' not in session:
-            return redirect('/login-administrador')
+            if ano and mes_num:
+                cursor.execute(f"""
+                    SELECT
+                        registros_ponto.data,
+                        registros_ponto.entrada,
+                        registros_ponto.saida_final,
+                        COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
+                        colaboradores.nome
+                    FROM registros_ponto
+                    INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                    LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                        AND eventos.nucleo = colaboradores.nucleo
+                    WHERE substr(registros_ponto.data,4,2) = ?
+                    AND substr(registros_ponto.data,7,4) = ?
+                    {filtro_todos}
+                    GROUP BY registros_ponto.id
+                    ORDER BY registros_ponto.id DESC
+                """, [mes_num, ano] + parametros)
+            else:
+                cursor.execute(f"""
+                    SELECT
+                        registros_ponto.data,
+                        registros_ponto.entrada,
+                        registros_ponto.saida_final,
+                        COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
+                        colaboradores.nome
+                    FROM registros_ponto
+                    INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                    LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                        AND eventos.nucleo = colaboradores.nucleo
+                    WHERE 1 = 1
+                    {filtro_todos}
+                    GROUP BY registros_ponto.id
+                    ORDER BY registros_ponto.id DESC
+                """, parametros)
 
-        if ano and mes_num:
-            cursor.execute("""
-                SELECT
-                    registros_ponto.data,
-                    registros_ponto.entrada,
-                    registros_ponto.saida_final,
-                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
-                    colaboradores.nome
-                FROM registros_ponto
-                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                    AND eventos.nucleo = colaboradores.nucleo
-                WHERE substr(registros_ponto.data,4,2) = ?
-                AND substr(registros_ponto.data,7,4) = ?
-                GROUP BY registros_ponto.id
-                ORDER BY registros_ponto.id DESC
-            """, (
-                mes_num,
-                ano
-            ))
+            registros = cursor.fetchall()
+            nome_colaborador = 'Todos os colaboradores'
+            todos = True
         else:
-            cursor.execute("""
-                SELECT
-                    registros_ponto.data,
-                    registros_ponto.entrada,
-                    registros_ponto.saida_final,
-                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
-                    colaboradores.nome
-                FROM registros_ponto
-                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                    AND eventos.nucleo = colaboradores.nucleo
-                GROUP BY registros_ponto.id
-                ORDER BY registros_ponto.id DESC
-            """)
-
-        registros = cursor.fetchall()
-        nome_colaborador = 'Todos os colaboradores'
-        todos = True
-
-    else:
-        if ano and mes_num:
-            cursor.execute("""
-                SELECT
-                    registros_ponto.data,
-                    registros_ponto.entrada,
-                    registros_ponto.saida_final,
-                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
-                FROM registros_ponto
-                LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                    AND eventos.nucleo = (SELECT nucleo FROM colaboradores WHERE id = registros_ponto.colaborador_id)
-                WHERE colaborador_id = ?
-                AND substr(registros_ponto.data,4,2) = ?
-                AND substr(registros_ponto.data,7,4) = ?
-                GROUP BY registros_ponto.id
-                ORDER BY registros_ponto.id DESC
-            """, (
+            registros = _registros_folha_colaborador(
+                cursor,
                 colaborador_id,
-                mes_num,
-                ano
-            ))
+                mes_num if (ano and mes_num) else None,
+                ano if (ano and mes_num) else None,
+                ordem='desc'
+            )
 
-        else:
             cursor.execute("""
-                SELECT
-                    registros_ponto.data,
-                    registros_ponto.entrada,
-                    registros_ponto.saida_final,
-                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
-                FROM registros_ponto
-                LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                    AND eventos.nucleo = (SELECT nucleo FROM colaboradores WHERE id = registros_ponto.colaborador_id)
-                WHERE colaborador_id = ?
-                GROUP BY registros_ponto.id
-                ORDER BY registros_ponto.id DESC
-            """, (
-                colaborador_id,
-            ))
-        registros = cursor.fetchall()
-
-        cursor.execute("""
-            SELECT nome
-            FROM colaboradores
-            WHERE id = ?
-        """, (
-            colaborador_id,
-        ))
-
-        nome_colaborador = cursor.fetchone()[0]
-        todos = False
+                SELECT nome
+                FROM colaboradores
+                WHERE id = ?
+            """, (colaborador_id,))
+            nome_colaborador_row = cursor.fetchone()
+            nome_colaborador = nome_colaborador_row[0] if nome_colaborador_row else 'Colaborador'
+            todos = False
     template_name = 'administrador/relatorios.html'
     if 'gestor_id' in session:
         template_name = 'gestor_nucleo/relatorios.html'
@@ -1368,9 +1684,21 @@ def registrar_entrada():
 
     with db_cursor(commit=True) as cursor:
         hora_atual = request.form['entrada']
-        data_hoje = datetime.now(
-            ZoneInfo("America/Sao_Paulo")
-        ).strftime('%d/%m/%Y')
+        data_hoje = _agora_sp().strftime('%d/%m/%Y')
+
+        cursor.execute("""
+            SELECT nucleo
+            FROM colaboradores
+            WHERE id = ?
+        """, (session['colaborador_id'],))
+        colaborador = cursor.fetchone()
+        bloqueio = _bloqueio_trabalho(
+            cursor,
+            data_hoje,
+            colaborador[0] if colaborador else ''
+        )
+        if bloqueio:
+            return _redirect_com_mensagem('/ponto', 'erro', bloqueio)
 
         cursor.execute("""
             SELECT id, entrada, saida_final
@@ -1415,7 +1743,7 @@ def registrar_entrada():
                     'Atualização de entrada',
                     f"{session.get('nome', 'Colaborador')} atualizou entrada em {data_hoje} para {hora_atual}."
                 )
-    return redirect('/ponto')
+    return _redirect_com_mensagem('/ponto', 'sucesso', 'Entrada registrada com sucesso.')
 # REGISTRAR SAÍDA FINAL
 
 @main_bp.route('/registrar-saida-final', methods=['POST'])
@@ -1426,9 +1754,21 @@ def registrar_saida_final():
 
     with db_cursor(commit=True) as cursor:
         hora_atual = request.form['saida_final']
-        data_hoje = datetime.now(
-            ZoneInfo("America/Sao_Paulo")
-        ).strftime('%d/%m/%Y')
+        data_hoje = _agora_sp().strftime('%d/%m/%Y')
+
+        cursor.execute("""
+            SELECT nucleo
+            FROM colaboradores
+            WHERE id = ?
+        """, (session['colaborador_id'],))
+        colaborador = cursor.fetchone()
+        bloqueio = _bloqueio_trabalho(
+            cursor,
+            data_hoje,
+            colaborador[0] if colaborador else ''
+        )
+        if bloqueio:
+            return _redirect_com_mensagem('/ponto', 'erro', bloqueio)
 
         cursor.execute("""
             SELECT id, entrada, saida_final
@@ -1458,7 +1798,7 @@ def registrar_saida_final():
                     'Registro de saída',
                     f"{session.get('nome', 'Colaborador')} registrou saída em {data_hoje} às {hora_atual}."
                 )
-    return redirect('/ponto')
+    return _redirect_com_mensagem('/ponto', 'sucesso', 'Saída registrada com sucesso.')
 
 @main_bp.route('/meu-relatorio')
 def meu_relatorio():
@@ -1474,27 +1814,13 @@ def meu_relatorio():
     mes = mes_selecionado.split('-')[1]
 
     with db_cursor() as cursor:
-        cursor.execute("""
-            SELECT
-                registros_ponto.data,
-                registros_ponto.entrada,
-                registros_ponto.saida_final,
-                COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
-            FROM registros_ponto
-            LEFT JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-            LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                AND eventos.nucleo = colaboradores.nucleo
-            WHERE colaborador_id = ?
-            AND substr(registros_ponto.data,4,2) = ?
-            AND substr(registros_ponto.data,7,4) = ?
-            GROUP BY registros_ponto.id
-            ORDER BY registros_ponto.id DESC
-        """, (
+        registros = _registros_folha_colaborador(
+            cursor,
             session['colaborador_id'],
             mes,
-            ano
-        ))
-        registros = cursor.fetchall()
+            ano,
+            ordem='desc'
+        )
 
         cursor.execute("""
             SELECT folha_assinada_nome
@@ -1599,6 +1925,48 @@ def download_folhas_assinadas():
     )
 
 
+@main_bp.route('/download-folha-assinada/<int:colaborador_id>')
+def download_folha_assinada_individual(colaborador_id):
+
+    if 'administrador_id' not in session and 'gestor_id' not in session:
+        return redirect('/login-gestor-nucleo')
+
+    with db_cursor() as cursor:
+        if 'gestor_id' in session:
+            cursor.execute("""
+                SELECT nome, folha_assinada_path, folha_assinada_nome
+                FROM colaboradores
+                WHERE id = ?
+                AND nucleo = ?
+            """, (
+                colaborador_id,
+                session['nucleo_gestor']
+            ))
+        else:
+            cursor.execute("""
+                SELECT nome, folha_assinada_path, folha_assinada_nome
+                FROM colaboradores
+                WHERE id = ?
+            """, (colaborador_id,))
+
+        colaborador = cursor.fetchone()
+
+    if not colaborador:
+        return _redirect_com_mensagem('/relatorios', 'erro', 'Colaborador não encontrado.')
+
+    nome, caminho, nome_arquivo = colaborador
+    if not (caminho and str(caminho).strip()) or not os.path.exists(caminho):
+        return _redirect_com_mensagem('/relatorios', 'erro', f'Folha assinada não encontrada para {nome}.')
+
+    download_name = nome_arquivo or f"folha_assinada_{colaborador_id}.pdf"
+    return send_file(
+        caminho,
+        as_attachment=True,
+        download_name=download_name,
+        mimetype='application/pdf'
+    )
+
+
 @main_bp.route('/salvar-observacao', methods=['POST'])
 def salvar_observacao():
 
@@ -1646,9 +2014,6 @@ def gerar_pdf():
                 return redirect('/relatorios')
 
             if colaborador_id == 'all':
-                if 'administrador_id' not in session:
-                    return redirect('/relatorios')
-
                 colaborador = ('Todos os Colaboradores', '', '')
             else:
                 cursor.execute("""
@@ -1689,9 +2054,15 @@ def gerar_pdf():
     print("MES PDF:", mes_selecionado)
 
     if colaborador_id == 'all':
+        filtro_nucleo = ""
+        parametros_extra = []
+        if 'gestor_id' in session:
+            filtro_nucleo = " AND colaboradores.nucleo = ?"
+            parametros_extra.append(session['nucleo_gestor'])
+
         if mes_selecionado and "-" in mes_selecionado:
             ano, mes = mes_selecionado.split('-')
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     registros_ponto.data,
                     registros_ponto.entrada,
@@ -1704,14 +2075,12 @@ def gerar_pdf():
                     AND eventos.nucleo = colaboradores.nucleo
                 WHERE substr(registros_ponto.data,4,2) = ?
                 AND substr(registros_ponto.data,7,4) = ?
+                {filtro_nucleo}
                 GROUP BY registros_ponto.id
                 ORDER BY registros_ponto.data
-            """, (
-                mes,
-                ano
-            ))
+            """, [mes, ano] + parametros_extra)
         else:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     registros_ponto.data,
                     registros_ponto.entrada,
@@ -1722,9 +2091,11 @@ def gerar_pdf():
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
                 LEFT JOIN eventos ON eventos.data = registros_ponto.data
                     AND eventos.nucleo = colaboradores.nucleo
+                WHERE 1 = 1
+                {filtro_nucleo}
                 GROUP BY registros_ponto.id
                 ORDER BY registros_ponto.data
-            """)
+            """, parametros_extra)
         registros = cursor.fetchall()
         nome_colaborador = colaborador[0].replace(" ", "_")
 
@@ -1737,42 +2108,19 @@ def gerar_pdf():
     else:
         if mes_selecionado and "-" in mes_selecionado:
             ano, mes = mes_selecionado.split('-')
-            cursor.execute("""
-                SELECT
-                    registros_ponto.data,
-                    registros_ponto.entrada,
-                    registros_ponto.saida_final,
-                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
-                FROM registros_ponto
-                LEFT JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                    AND eventos.nucleo = colaboradores.nucleo
-                WHERE registros_ponto.colaborador_id = ?
-                AND substr(registros_ponto.data,4,2) = ?
-                AND substr(registros_ponto.data,7,4) = ?
-                GROUP BY registros_ponto.id
-                ORDER BY registros_ponto.data
-            """, (
+            registros = _registros_folha_colaborador(
+                cursor,
                 colaborador_id,
                 mes,
-                ano
-            ))
+                ano,
+                ordem='asc'
+            )
         else:
-            cursor.execute("""
-                SELECT
-                    registros_ponto.data,
-                    registros_ponto.entrada,
-                    registros_ponto.saida_final,
-                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao
-                FROM registros_ponto
-                LEFT JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                    AND eventos.nucleo = colaboradores.nucleo
-                WHERE registros_ponto.colaborador_id = ?
-                GROUP BY registros_ponto.id
-                ORDER BY registros_ponto.data
-            """, (colaborador_id,))
-        registros = cursor.fetchall()
+            registros = _registros_folha_colaborador(
+                cursor,
+                colaborador_id,
+                ordem='asc'
+            )
         nome_colaborador = colaborador[0].replace(" ", "_")
 
         if mes_selecionado and "-" in mes_selecionado:
@@ -2009,8 +2357,6 @@ def gerar_excel():
                 return redirect('/relatorios')
 
             if colaborador_id == 'all':
-                if 'administrador_id' not in session:
-                    return redirect('/relatorios')
                 colaborador = ('Todos os Colaboradores', '', '')
             else:
                 cursor.execute("""
@@ -2048,9 +2394,15 @@ def gerar_excel():
     print("MES EXCEL:", mes_selecionado)
 
     if colaborador_id == 'all':
+        filtro_nucleo = ""
+        parametros_extra = []
+        if 'gestor_id' in session:
+            filtro_nucleo = " AND colaboradores.nucleo = ?"
+            parametros_extra.append(session['nucleo_gestor'])
+
         if mes_selecionado and "-" in mes_selecionado:
             ano, mes = mes_selecionado.split('-')
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     data,
                     entrada,
@@ -2061,13 +2413,11 @@ def gerar_excel():
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
                 WHERE substr(registros_ponto.data,4,2) = ?
                 AND substr(registros_ponto.data,7,4) = ?
+                {filtro_nucleo}
                 ORDER BY data
-            """, (
-                mes,
-                ano
-            ))
+            """, [mes, ano] + parametros_extra)
         else:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     data,
                     entrada,
@@ -2076,40 +2426,29 @@ def gerar_excel():
                     colaboradores.nome
                 FROM registros_ponto
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                WHERE 1 = 1
+                {filtro_nucleo}
                 ORDER BY data
-            """)
+            """, parametros_extra)
     else:
         if mes_selecionado and "-" in mes_selecionado:
             ano, mes = mes_selecionado.split('-')
-            cursor.execute("""
-                SELECT
-                    data,
-                    entrada,
-                    saida_final,
-                    observacao
-                FROM registros_ponto
-                WHERE colaborador_id = ?
-                AND substr(data,4,2) = ?
-                AND substr(data,7,4) = ?
-                ORDER BY data
-            """, (
+            registros = _registros_folha_colaborador(
+                cursor,
                 colaborador_id,
                 mes,
-                ano
-            ))
+                ano,
+                ordem='asc'
+            )
         else:
-            cursor.execute("""
-                SELECT
-                    data,
-                    entrada,
-                    saida_final,
-                    observacao
-                FROM registros_ponto
-                WHERE colaborador_id = ?
-                ORDER BY data
-            """, (colaborador_id,))
+            registros = _registros_folha_colaborador(
+                cursor,
+                colaborador_id,
+                ordem='asc'
+            )
 
-    registros = cursor.fetchall()
+    if colaborador_id == 'all':
+        registros = cursor.fetchall()
     wb = Workbook()
     ws = wb.active
     ws.title = "Frequência"
@@ -2259,13 +2598,21 @@ def lancar_ponto():
 
     with db_cursor() as cursor:
         cursor.execute("""
-        SELECT id, nome, nucleo
+        SELECT DISTINCT trim(nucleo) AS nucleo
+        FROM colaboradores
+        WHERE status = 'Ativo'
+        AND trim(COALESCE(nucleo, '')) != ''
+        ORDER BY nucleo
+    """)
+        nucleos = [row[0] for row in cursor.fetchall()]
+
+        cursor.execute("""
+        SELECT id, nome, trim(COALESCE(nucleo, ''))
         FROM colaboradores
         WHERE status = 'Ativo'
         ORDER BY nome
     """)
-
-    colaboradores = cursor.fetchall()
+        colaboradores = cursor.fetchall()
     
     # Data atual no formato YYYY-MM-DD para o input type="date"
     data_atual = datetime.now().strftime('%Y-%m-%d')
@@ -2273,7 +2620,10 @@ def lancar_ponto():
     return render_template(
         'administrador/lancar_ponto.html',
         colaboradores=colaboradores,
-        data_atual=data_atual
+        nucleos=nucleos,
+        data_atual=data_atual,
+        erro=_mensagem_query('erro'),
+        sucesso=_mensagem_query('sucesso')
     )
 
 @main_bp.route('/salvar-lancamento-ponto', methods=['POST'])
@@ -2287,33 +2637,68 @@ def salvar_lancamento_ponto():
     entrada = request.form['entrada']
     saida_final = request.form['saida_final']
     observacao = request.form['observacao']
+    data_formatada = _data_iso_para_br(data)
 
     with db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT nome FROM colaboradores WHERE id = ?", (colaborador_id,))
+        cursor.execute("SELECT nome, nucleo FROM colaboradores WHERE id = ?", (colaborador_id,))
         colaborador_info = cursor.fetchone()
+        bloqueio = _bloqueio_trabalho(
+            cursor,
+            data_formatada,
+            colaborador_info[1] if colaborador_info else ''
+        )
+        if bloqueio:
+            return _redirect_com_mensagem('/lancar-ponto', 'erro', bloqueio)
+
         cursor.execute("""
-        INSERT INTO registros_ponto (
+            SELECT id
+            FROM registros_ponto
+            WHERE colaborador_id = ?
+            AND data = ?
+        """, (
             colaborador_id,
-            data,
+            data_formatada
+        ))
+        registro_existente = cursor.fetchone()
+
+        if registro_existente:
+            cursor.execute("""
+                UPDATE registros_ponto
+                SET
+                    entrada = ?,
+                    saida_final = ?,
+                    observacao = ?
+                WHERE id = ?
+            """, (
+                entrada,
+                saida_final,
+                observacao,
+                registro_existente[0]
+            ))
+        else:
+            cursor.execute("""
+            INSERT INTO registros_ponto (
+                colaborador_id,
+                data,
+                entrada,
+                saida_final,
+                observacao
+            )
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            colaborador_id,
+            data_formatada,
             entrada,
             saida_final,
             observacao
-        )
-        VALUES (?, ?, ?, ?, ?)
-    """, (
-        colaborador_id,
-        data,
-        entrada,
-        saida_final,
-        observacao
-    ))
+        ))
         _registrar_log(
             cursor,
             'Lançamento manual de ponto',
-            f"{session.get('nome_admin', 'Administrador')} lançou ponto para {(colaborador_info[0] if colaborador_info else colaborador_id)} em {data}."
+            f"{session.get('nome_admin', 'Administrador')} lançou ponto para {(colaborador_info[0] if colaborador_info else colaborador_id)} em {data_formatada}."
         )
 
-    return redirect('/lancar-ponto')
+    return _redirect_com_mensagem('/lancar-ponto', 'sucesso', 'Ponto lançado com sucesso.')
 
 @main_bp.route('/enviar-ajuste', methods=['POST'])
 def enviar_ajuste():
@@ -2321,28 +2706,55 @@ def enviar_ajuste():
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
+    data_ajuste = _data_iso_para_br(request.form.get('data'))
+    tipo_ajuste = request.form.get('tipo', '').strip()
+    horario_correto = request.form.get('horario', '').strip()
+    motivo = request.form.get('motivo', '').strip()
+
+    if tipo_ajuste not in ('Entrada', 'Saída'):
+        return _redirect_com_mensagem('/ajuste-ponto', 'erro', 'Tipo de ajuste inválido.')
+
     with db_cursor(commit=True) as cursor:
+        cursor.execute("""
+            SELECT nucleo
+            FROM colaboradores
+            WHERE id = ?
+        """, (session['colaborador_id'],))
+        colaborador = cursor.fetchone()
+
+        bloqueio = _bloqueio_trabalho(
+            cursor,
+            data_ajuste,
+            colaborador[0] if colaborador else ''
+        )
+        if bloqueio:
+            return _redirect_com_mensagem('/ajuste-ponto', 'erro', bloqueio)
+
         cursor.execute("""
         INSERT INTO ajustes_ponto (
             colaborador_id,
             data,
+            tipo_ajuste,
+            horario_correto,
             motivo,
             status
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
     """, (
         session['colaborador_id'],
-        request.form['data'],
-        request.form['motivo'],
+        data_ajuste,
+        tipo_ajuste,
+        horario_correto,
+        motivo,
         'Pendente'
     ))
         _registrar_log(
             cursor,
             'Solicitação de ajuste',
-            f"{session.get('nome', 'Colaborador')} abriu solicitação de ajuste para {request.form['data']}."
+            f"{session.get('nome', 'Colaborador')} abriu solicitação de ajuste para {data_ajuste}."
         )
 
-    return redirect('/meus-ajustes')
+    return _redirect_com_mensagem('/ajuste-ponto', 'sucesso', 'Solicitação enviada com sucesso.')
 
 @main_bp.route('/primeiro-acesso-gestor')
 def primeiro_acesso_gestor():

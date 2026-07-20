@@ -10,8 +10,11 @@
 
     <tr>
         <th>Data</th>
+        <th>Tipo</th>
+        <th>Horário correto</th>
         <th>Motivo</th>
         <th>Status</th>
+        <th>Detalhes da análise</th>
     </tr>
 
     {% if ajustes %}
@@ -24,28 +27,42 @@
 
             <td>{{ ajuste[1] }}</td>
 
+            <td>{{ ajuste[2] }}</td>
+
+            <td>{{ ajuste[3] }}</td>
+
             <td>
 
-                {% if ajuste[2] == 'Pendente' %}
+                {% if ajuste[4] == 'Pendente' %}
 
-                    <span style="color:orange;">
+                    <span class="status-pill pending">
                         ● Pendente
                     </span>
 
-                {% elif ajuste[2] == 'Aprovado' %}
+                {% elif ajuste[4] == 'Aprovado' %}
 
-                    <span style="color:green;">
+                    <span class="status-pill approved">
                         ● Aprovado
                     </span>
 
                 {% else %}
 
-                    <span style="color:red;">
+                    <span class="status-pill rejected">
                         ● Reprovado
                     </span>
 
                 {% endif %}
 
+            </td>
+
+            <td>
+                {% if ajuste[4] == 'Reprovado' and ajuste[5] %}
+                    Reprovado por {{ ajuste[6] or 'Gestão' }}: {{ ajuste[5] }}
+                {% elif ajuste[4] == 'Aprovado' %}
+                    Aprovado por {{ ajuste[6] or 'Gestão' }}
+                {% else %}
+                    —
+                {% endif %}
             </td>
 
         </tr>
@@ -56,7 +73,7 @@
 
         <tr>
 
-            <td colspan="3">
+            <td colspan="6">
 
                 Nenhuma solicitação encontrada.
 
