@@ -261,7 +261,7 @@ def login_administrador():
         login = request.form.get('login')
         senha = request.form.get('senha')
 
-        if login == 'gestor1' and senha == 'gestor2026':
+        if login == 'gestorpge' and senha == 'pge@2026':
 
             session.clear()
             session['administrador_id'] = 1
