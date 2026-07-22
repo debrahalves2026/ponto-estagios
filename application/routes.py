@@ -122,6 +122,22 @@ def _validar_campo_nome(valor, rotulo, obrigatorio=True):
     return valor_normalizado, None
 
 
+def _formatar_texto_evento(tipo, titulo, horario=''):
+    tipo_norm = _normalizar_espacos(tipo)
+    titulo_norm = _normalizar_espacos(titulo)
+    horario_norm = _normalizar_espacos(horario)
+
+    if titulo_norm and titulo_norm.lower() != tipo_norm.lower():
+        base = f'{tipo_norm} - {titulo_norm}'
+    else:
+        base = tipo_norm or titulo_norm
+
+    if horario_norm:
+        return f'{base} ({horario_norm})'
+
+    return base
+
+
 def _colaborador_nucleo(cursor, colaborador_id):
     cursor.execute("""
         SELECT nome, nucleo
@@ -218,11 +234,13 @@ def _registros_folha_colaborador(cursor, colaborador_id, mes=None, ano=None, ord
     cursor.execute(f"""
         SELECT
             data,
-            group_concat(tipo || ' - ' || titulo, '; ') AS eventos_obs
+            tipo,
+            titulo,
+            COALESCE(horario, '')
         FROM eventos
         WHERE (nucleo = ? OR nucleo IS NULL OR trim(nucleo) = '')
         {filtro_periodo}
-        GROUP BY data
+        ORDER BY data, horario, tipo, titulo
     """, parametros_eventos)
     eventos = cursor.fetchall()
 
@@ -235,7 +253,15 @@ def _registros_folha_colaborador(cursor, colaborador_id, mes=None, ano=None, ord
             'observacao': observacao
         }
 
-    for data, eventos_obs in eventos:
+    eventos_por_data = {}
+    for data, tipo, titulo, horario in eventos:
+        eventos_por_data.setdefault(data, [])
+        texto_evento = _formatar_texto_evento(tipo, titulo, horario)
+        if texto_evento and texto_evento not in eventos_por_data[data]:
+            eventos_por_data[data].append(texto_evento)
+
+    for data, lista_eventos in eventos_por_data.items():
+        eventos_obs = '; '.join(lista_eventos)
         item = itens_por_data.get(data)
         if item:
             if not (item['observacao'] or '').strip():
@@ -1183,15 +1209,22 @@ def calendario():
     with db_cursor() as cursor:
         if 'gestor_id' in session:
             cursor.execute("""
-                SELECT id, titulo, tipo, data, descricao
+                SELECT id, titulo, tipo, data, descricao, horario
                 FROM eventos
                 WHERE nucleo = ?
-                ORDER BY data
+                ORDER BY data, horario, id
             """, (
                 session['nucleo_gestor'],
             ))
             eventos = cursor.fetchall()
-            return render_template('gestor_nucleo/calendario.html', eventos=eventos, nucleo=session['nucleo_gestor'], data_atual=data_atual)
+            return render_template(
+                'gestor_nucleo/calendario.html',
+                eventos=eventos,
+                nucleo=session['nucleo_gestor'],
+                data_atual=data_atual,
+                erro=_mensagem_query('erro'),
+                sucesso=_mensagem_query('sucesso')
+            )
 
         if 'administrador_id' in session:
             cursor.execute("""
@@ -1214,9 +1247,13 @@ def adicionar_evento():
     tipo = request.form.get('tipo', '').strip()
     data = request.form.get('data', '').strip()
     descricao = request.form.get('descricao', '').strip()
+    horario = request.form.get('horario', '').strip()
 
     if not titulo or not tipo or not data:
-        return redirect('/calendario')
+        return _redirect_com_mensagem('/calendario', 'erro', 'Preencha os campos obrigatórios do evento.')
+
+    if horario and not re.fullmatch(r'^([01]\d|2[0-3]):[0-5]\d$', horario):
+        return _redirect_com_mensagem('/calendario', 'erro', 'Horário inválido. Use o formato HH:MM.')
 
     try:
         data_formatada = datetime.strptime(data, '%Y-%m-%d').strftime('%d/%m/%Y')
@@ -1225,22 +1262,43 @@ def adicionar_evento():
 
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
+            SELECT id
+            FROM eventos
+            WHERE nucleo = ?
+              AND data = ?
+              AND tipo = ?
+              AND titulo = ?
+              AND COALESCE(horario, '') = ?
+            LIMIT 1
+        """, (
+            session['nucleo_gestor'],
+            data_formatada,
+            tipo,
+            titulo,
+            horario
+        ))
+        if cursor.fetchone():
+            return _redirect_com_mensagem('/calendario', 'erro', 'Esse evento já foi cadastrado para esta data e horário.')
+
+        cursor.execute("""
         INSERT INTO eventos (
             titulo,
             tipo,
             data,
             descricao,
-            nucleo
-        ) VALUES (?, ?, ?, ?, ?)
+            nucleo,
+            horario
+        ) VALUES (?, ?, ?, ?, ?, ?)
     """, (
         titulo,
         tipo,
         data_formatada,
         descricao,
-        session['nucleo_gestor']
+        session['nucleo_gestor'],
+        horario
     ))
 
-    return redirect('/calendario')
+    return _redirect_com_mensagem('/calendario', 'sucesso', 'Evento cadastrado com sucesso.')
 
 
 @main_bp.route('/apagar-evento', methods=['POST'])
@@ -1514,7 +1572,24 @@ def visualizar_relatorio():
                         registros_ponto.data,
                         registros_ponto.entrada,
                         registros_ponto.saida_final,
-                        COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
+                        COALESCE(
+                            NULLIF(registros_ponto.observacao, ''),
+                            REPLACE(
+                                group_concat(
+                                    DISTINCT CASE
+                                        WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
+                                            THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                        WHEN trim(COALESCE(eventos.horario, '')) != ''
+                                            THEN trim(COALESCE(eventos.tipo, eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                        WHEN lower(trim(COALESCE(eventos.titulo, ''))) = lower(trim(COALESCE(eventos.tipo, '')))
+                                            THEN trim(COALESCE(eventos.tipo, eventos.titulo, ''))
+                                        ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
+                                    END
+                                ),
+                                ',',
+                                '; '
+                            )
+                        ) AS observacao,
                         colaboradores.nome
                     FROM registros_ponto
                     INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
@@ -1532,7 +1607,24 @@ def visualizar_relatorio():
                         registros_ponto.data,
                         registros_ponto.entrada,
                         registros_ponto.saida_final,
-                        COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
+                        COALESCE(
+                            NULLIF(registros_ponto.observacao, ''),
+                            REPLACE(
+                                group_concat(
+                                    DISTINCT CASE
+                                        WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
+                                            THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                        WHEN trim(COALESCE(eventos.horario, '')) != ''
+                                            THEN trim(COALESCE(eventos.tipo, eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                        WHEN lower(trim(COALESCE(eventos.titulo, ''))) = lower(trim(COALESCE(eventos.tipo, '')))
+                                            THEN trim(COALESCE(eventos.tipo, eventos.titulo, ''))
+                                        ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
+                                    END
+                                ),
+                                ',',
+                                '; '
+                            )
+                        ) AS observacao,
                         colaboradores.nome
                     FROM registros_ponto
                     INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
@@ -2132,7 +2224,24 @@ def gerar_pdf():
                     registros_ponto.data,
                     registros_ponto.entrada,
                     registros_ponto.saida_final,
-                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
+                    COALESCE(
+                        NULLIF(registros_ponto.observacao, ''),
+                        REPLACE(
+                            group_concat(
+                                DISTINCT CASE
+                                    WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
+                                        THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                    WHEN trim(COALESCE(eventos.horario, '')) != ''
+                                        THEN trim(COALESCE(eventos.tipo, eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                    WHEN lower(trim(COALESCE(eventos.titulo, ''))) = lower(trim(COALESCE(eventos.tipo, '')))
+                                        THEN trim(COALESCE(eventos.tipo, eventos.titulo, ''))
+                                    ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
+                                END
+                            ),
+                            ',',
+                            '; '
+                        )
+                    ) AS observacao,
                     colaboradores.nome
                 FROM registros_ponto
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
@@ -2150,7 +2259,24 @@ def gerar_pdf():
                     registros_ponto.data,
                     registros_ponto.entrada,
                     registros_ponto.saida_final,
-                    COALESCE(NULLIF(registros_ponto.observacao, ''), group_concat(eventos.tipo || ' - ' || eventos.titulo, '; ')) AS observacao,
+                    COALESCE(
+                        NULLIF(registros_ponto.observacao, ''),
+                        REPLACE(
+                            group_concat(
+                                DISTINCT CASE
+                                    WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
+                                        THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                    WHEN trim(COALESCE(eventos.horario, '')) != ''
+                                        THEN trim(COALESCE(eventos.tipo, eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                    WHEN lower(trim(COALESCE(eventos.titulo, ''))) = lower(trim(COALESCE(eventos.tipo, '')))
+                                        THEN trim(COALESCE(eventos.tipo, eventos.titulo, ''))
+                                    ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
+                                END
+                            ),
+                            ',',
+                            '; '
+                        )
+                    ) AS observacao,
                     colaboradores.nome
                 FROM registros_ponto
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id

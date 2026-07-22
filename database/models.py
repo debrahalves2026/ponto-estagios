@@ -72,7 +72,8 @@ def criar_tabelas():
         tipo TEXT,
         data TEXT,
         descricao TEXT,
-        nucleo TEXT
+        nucleo TEXT,
+        horario TEXT
     )
     """)
 
@@ -113,6 +114,11 @@ def criar_tabelas():
         cursor.execute("ALTER TABLE ajustes_ponto ADD COLUMN analisado_por TEXT")
     if 'data_analise' not in columns:
         cursor.execute("ALTER TABLE ajustes_ponto ADD COLUMN data_analise TEXT")
+
+    cursor.execute("PRAGMA table_info(eventos)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'horario' not in columns:
+        cursor.execute("ALTER TABLE eventos ADD COLUMN horario TEXT")
 
     conn.commit()
 

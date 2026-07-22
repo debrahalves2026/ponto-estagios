@@ -4,6 +4,14 @@
 
 <h1>Calendário do Núcleo {{ nucleo }}</h1>
 
+{% if erro %}
+<p class="alert alert-error">{{ erro }}</p>
+{% endif %}
+
+{% if sucesso %}
+<p class="alert alert-success">{{ sucesso }}</p>
+{% endif %}
+
 <form action="/adicionar-evento" method="POST" id="evento-form">
     <input type="hidden" name="titulo" id="titulo" value="">
 
@@ -25,6 +33,9 @@
 
     <label>Data</label><br>
     <input type="date" name="data" value="{{ data_atual }}" required><br><br>
+
+    <label>Horário (opcional)</label><br>
+    <input type="time" name="horario"><br><br>
 
     <label>Descrição</label><br>
     <textarea name="descricao" rows="4" cols="50" placeholder="Descrição opcional do evento"></textarea><br><br>
@@ -78,6 +89,7 @@
         <tr>
             <th> </th>
             <th>Data</th>
+            <th>Horário</th>
             <th>Tipo</th>
             <th>Título</th>
             <th>Descrição</th>
@@ -88,6 +100,7 @@
                 <input type="radio" name="event_id" value="{{ evento[0] }}">
             </td>
             <td>{{ evento[3] }}</td>
+            <td>{{ evento[5] or 'Dia todo' }}</td>
             <td>{{ evento[2] }}</td>
             <td>{{ evento[1] }}</td>
             <td>{{ evento[4] }}</td>
