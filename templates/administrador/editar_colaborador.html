@@ -4,6 +4,16 @@
 
 <h1>Editar Colaborador</h1>
 
+{% if erro %}
+    <div class="form-error">{{ erro }}</div>
+    <br>
+{% endif %}
+
+{% if sucesso %}
+    <div class="form-success">{{ sucesso }}</div>
+    <br>
+{% endif %}
+
 <form method="POST"
       action="/atualizar-colaborador/{{ colaborador[0] }}">
 
@@ -15,6 +25,8 @@
         type="text"
         name="nome"
         value="{{ colaborador[1] }}"
+        pattern="[A-Za-zÀ-ÖØ-öø-ÿ]+(?: [A-Za-zÀ-ÖØ-öø-ÿ]+)*"
+        title="Use apenas letras e espaços."
         required>
 
     <br><br>

@@ -34,6 +34,11 @@ def _celula_pdf(valor, estilo):
 
 main_bp = Blueprint('main', __name__)
 
+ADMIN_LOGIN = 'gestorpge'
+ADMIN_PASSWORD = 'NatiPGE#1207'
+DEFAULT_USER_PASSWORD = 'Novocolab123'
+NAME_FIELD_PATTERN = re.compile(r'^[A-Za-zÀ-ÖØ-öø-ÿ]+(?: [A-Za-zÀ-ÖØ-öø-ÿ]+)*$')
+
 
 def _usuario_log_atual():
     if 'administrador_id' in session:
@@ -97,6 +102,24 @@ def _mensagem_query(param):
 
 def _redirect_com_mensagem(path, chave, mensagem):
     return redirect(f"{path}?{chave}={quote_plus(mensagem)}")
+
+
+def _normalizar_espacos(texto):
+    return re.sub(r'\s+', ' ', (texto or '').strip())
+
+
+def _validar_campo_nome(valor, rotulo, obrigatorio=True):
+    valor_normalizado = _normalizar_espacos(valor)
+
+    if not valor_normalizado:
+        if obrigatorio:
+            return None, f'{rotulo} é obrigatório.'
+        return '', None
+
+    if not NAME_FIELD_PATTERN.fullmatch(valor_normalizado):
+        return None, f'{rotulo} deve conter apenas letras e espaços.'
+
+    return valor_normalizado, None
 
 
 def _colaborador_nucleo(cursor, colaborador_id):
@@ -261,7 +284,7 @@ def login_administrador():
         login = request.form.get('login')
         senha = request.form.get('senha')
 
-        if login == 'gestorpge' and senha == 'pge@2026':
+        if login == ADMIN_LOGIN and senha == ADMIN_PASSWORD:
 
             session.clear()
             session['administrador_id'] = 1
@@ -308,7 +331,7 @@ def login_gestor_nucleo():
             session['nucleo_gestor'] = gestor[2]
 
             # Primeiro acesso
-            if gestor[6] == "Novocolab123":
+            if gestor[6] == DEFAULT_USER_PASSWORD:
                 return redirect('/primeiro-acesso-gestor')
 
             return redirect('/dashboard-gestor-nucleo')
@@ -393,7 +416,8 @@ def cadastro_gestor():
         return redirect('/login-administrador')
 
     return render_template(
-        'administrador/cadastro_gestor.html'
+        'administrador/cadastro_gestor.html',
+        erro=_mensagem_query('erro')
     )
 
 
@@ -403,11 +427,22 @@ def salvar_gestor():
     if 'administrador_id' not in session:
         return redirect('/login-administrador')
 
-    nome = request.form.get('nome', '')
+    nome, erro_nome = _validar_campo_nome(request.form.get('nome', ''), 'Nome completo')
     nucleo = request.form.get('nucleo', '')
     unidade_exercicio = request.form.get('unidade_exercicio', '')
     celular = request.form.get('celular', '')
     login = request.form.get('login', '')
+
+    if erro_nome:
+        return render_template(
+            'administrador/cadastro_gestor.html',
+            erro=erro_nome,
+            nome=request.form.get('nome', ''),
+            nucleo=nucleo,
+            unidade_exercicio=unidade_exercicio,
+            celular=celular,
+            login=login
+        )
 
     try:
         with db_cursor(commit=True) as cursor:
@@ -427,7 +462,7 @@ def salvar_gestor():
                 unidade_exercicio,
                 celular,
                 login,
-                "Novocolab123"
+                DEFAULT_USER_PASSWORD
             ))
             _registrar_log(
                 cursor,
@@ -470,7 +505,9 @@ def editar_gestor(id):
     gestor = cursor.fetchone()
     return render_template(
         'administrador/editar_gestor.html',
-        gestor=gestor
+        gestor=gestor,
+        erro=_mensagem_query('erro'),
+        sucesso=_mensagem_query('sucesso')
     )
 
 
@@ -479,6 +516,11 @@ def atualizar_gestor(id):
 
     if 'administrador_id' not in session:
         return redirect('/login-administrador')
+
+    nome, erro_nome = _validar_campo_nome(request.form.get('nome', ''), 'Nome completo')
+
+    if erro_nome:
+        return _redirect_com_mensagem(f'/editar-gestor/{id}', 'erro', erro_nome)
 
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
@@ -489,13 +531,13 @@ def atualizar_gestor(id):
             login = ?
         WHERE id = ?
     """, (
-        request.form['nome'],
+        nome,
         request.form['nucleo'],
         request.form['login'],
         id
     ))
 
-    return redirect('/gestores-cadastrados')
+    return _redirect_com_mensagem(f'/editar-gestor/{id}', 'sucesso', 'Gestor atualizado com sucesso.')
 
 
 @main_bp.route('/cancelar-gestor/<int:id>', methods=['POST'])
@@ -547,7 +589,7 @@ def resetar_senha_gestor(id):
         SET senha = ?
         WHERE id = ?
     """, (
-        "Novocolab123",
+        DEFAULT_USER_PASSWORD,
         id
     ))
 
@@ -565,7 +607,7 @@ def resetar_senha_colaborador(id):
         SET senha = ?
         WHERE id = ?
     """, (
-        "Novocolab123",
+        DEFAULT_USER_PASSWORD,
         id
     ))
 
@@ -618,7 +660,7 @@ def login_colaborador():
             session['colaborador_id'] = colaborador[0]
             session['nome'] = colaborador[1]
 
-            if colaborador[11] == "Novocolab123":
+            if colaborador[11] == DEFAULT_USER_PASSWORD:
                 return redirect('/primeiro-acesso')
 
             return redirect('/ponto')
@@ -638,13 +680,15 @@ def cadastro_colaborador():
 
     if 'administrador_id' in session:
         return render_template(
-            'administrador/cadastro_colaborador.html'
+            'administrador/cadastro_colaborador.html',
+            erro=_mensagem_query('erro')
         )
 
     if 'gestor_id' in session:
         return render_template(
             'gestor_nucleo/cadastro_colaborador.html',
-            nucleo=session['nucleo_gestor']
+            nucleo=session['nucleo_gestor'],
+            erro=_mensagem_query('erro')
         )
 
     return redirect('/')
@@ -1540,6 +1584,20 @@ def visualizar_relatorio():
 @main_bp.route('/salvar-colaborador', methods=['POST'])
 def salvar_colaborador():
 
+    nome, erro_nome = _validar_campo_nome(request.form.get('nome', ''), 'Nome completo')
+    procurador_monitor, erro_monitor = _validar_campo_nome(
+        request.form.get('procurador_monitor', ''),
+        'Procurador Monitor',
+        obrigatorio=False
+    )
+
+    if erro_nome or erro_monitor:
+        return _redirect_com_mensagem(
+            '/cadastro-colaborador',
+            'erro',
+            erro_nome or erro_monitor
+        )
+
     with db_cursor(commit=True) as cursor:
         # Se for Gestor do Núcleo, usa automaticamente o núcleo dele
         if 'gestor_id' in session:
@@ -1564,14 +1622,14 @@ def salvar_colaborador():
             )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        request.form['nome'],
+        nome,
         request.form['vinculo'],
         nucleo,
         request.form['turno'],
         request.form['horario'],
         request.form['presencial'],
         request.form['unidade_exercicio'],
-        request.form['procurador_monitor'],
+        procurador_monitor,
         request.form['celular'],
         request.form['login'],
         request.form['senha']
@@ -1579,7 +1637,7 @@ def salvar_colaborador():
         _registrar_log(
             cursor,
             'Cadastro de colaborador',
-            f"{session.get('nome_admin', 'Usuário')} cadastrou o colaborador {request.form['nome']}."
+            f"{session.get('nome_admin', 'Usuário')} cadastrou o colaborador {nome}."
         )
 
     return redirect('/colaboradores-cadastrados')
@@ -1647,12 +1705,19 @@ def editar_colaborador(id):
     colaborador = cursor.fetchone()
     return render_template(
         'administrador/editar_colaborador.html',
-        colaborador=colaborador
+        colaborador=colaborador,
+        erro=_mensagem_query('erro'),
+        sucesso=_mensagem_query('sucesso')
     )
 # ATUALIZAR COLABORADOR
 
 @main_bp.route('/atualizar-colaborador/<int:id>', methods=['POST'])
 def atualizar_colaborador(id):
+
+    nome, erro_nome = _validar_campo_nome(request.form.get('nome', ''), 'Nome completo')
+
+    if erro_nome:
+        return _redirect_com_mensagem(f'/editar-colaborador/{id}', 'erro', erro_nome)
 
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
@@ -1665,7 +1730,7 @@ def atualizar_colaborador(id):
             celular = ?
         WHERE id = ?
     """, (
-        request.form['nome'],
+        nome,
         request.form['nucleo'],
         request.form['turno'],
         request.form['horario'],
@@ -1673,7 +1738,7 @@ def atualizar_colaborador(id):
         id
     ))
 
-    return redirect('/colaboradores-cadastrados')
+    return _redirect_com_mensagem(f'/editar-colaborador/{id}', 'sucesso', 'Colaborador atualizado com sucesso.')
 # REGISTRAR ENTRADA
 
 @main_bp.route('/registrar-entrada', methods=['POST'])
@@ -2559,7 +2624,7 @@ def alterar_senha():
         As senhas não coincidem.
         """
 
-    if senha1 == "Novocolab123":
+    if senha1 == DEFAULT_USER_PASSWORD:
         return """
         A senha padrão não pode ser utilizada novamente.
         """
@@ -2778,7 +2843,7 @@ def alterar_senha_gestor():
     if senha1 != senha2:
         return "As senhas não coincidem."
 
-    if senha1 == "Novocolab123":
+    if senha1 == DEFAULT_USER_PASSWORD:
         return "A senha padrão não pode ser utilizada novamente."
 
     padrao = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$'

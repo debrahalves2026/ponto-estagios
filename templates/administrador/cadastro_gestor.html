@@ -16,6 +16,8 @@
         name="nome"
         placeholder="Nome Completo"
         value="{{ nome or '' }}"
+        pattern="[A-Za-zÀ-ÖØ-öø-ÿ]+(?: [A-Za-zÀ-ÖØ-öø-ÿ]+)*"
+        title="Use apenas letras e espaços."
         required>
 
     <br><br>

@@ -4,6 +4,16 @@
 
 <h1>Editar Gestor</h1>
 
+{% if erro %}
+    <div class="form-error">{{ erro }}</div>
+    <br>
+{% endif %}
+
+{% if sucesso %}
+    <div class="form-success">{{ sucesso }}</div>
+    <br>
+{% endif %}
+
 <form action="/atualizar-gestor/{{ gestor[0] }}" method="POST">
 
     <input
@@ -11,6 +21,8 @@
         name="nome"
         placeholder="Nome Completo"
         value="{{ gestor[1] }}"
+        pattern="[A-Za-zÀ-ÖØ-öø-ÿ]+(?: [A-Za-zÀ-ÖØ-öø-ÿ]+)*"
+        title="Use apenas letras e espaços."
         required>
 
     <br><br>

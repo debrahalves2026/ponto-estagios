@@ -4,12 +4,19 @@
 
 <h1>Cadastro de Colaborador</h1>
 
+{% if erro %}
+    <div class="form-error">{{ erro }}</div>
+    <br>
+{% endif %}
+
 <form method="POST" action="/salvar-colaborador">
 
     <input
         type="text"
         name="nome"
         placeholder="Nome Completo"
+        pattern="[A-Za-zÀ-ÖØ-öø-ÿ]+(?: [A-Za-zÀ-ÖØ-öø-ÿ]+)*"
+        title="Use apenas letras e espaços."
         required>
 
     <br><br>
@@ -80,7 +87,9 @@
     <input
         type="text"
         name="procurador_monitor"
-        placeholder="Procurador Monitor">
+        placeholder="Procurador Monitor"
+        pattern="[A-Za-zÀ-ÖØ-öø-ÿ]+(?: [A-Za-zÀ-ÖØ-öø-ÿ]+)*"
+        title="Use apenas letras e espaços.">
 
     <br><br>
 
