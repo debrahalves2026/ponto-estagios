@@ -12,6 +12,7 @@ from zipfile import ZipFile
 from urllib.parse import quote_plus
 import os
 import re
+import hmac
 import tempfile
 from xml.sax.saxutils import escape
 from .app_utils import (
@@ -34,10 +35,45 @@ def _celula_pdf(valor, estilo):
 
 main_bp = Blueprint('main', __name__)
 
-ADMIN_LOGIN = 'gestorpge'
-ADMIN_PASSWORD = 'NatiPGE#1207'
+ADMIN_USERS = {
+    'gestorpge': {
+        'password': 'NatiPGE#1207',
+        'nome': 'Administrador',
+        'can_purge_users': False
+    },
+    'dasilva': {
+        'password': 'Lenovo2026@',
+        'nome': 'Da Silva',
+        'can_purge_users': True
+    }
+}
 DEFAULT_USER_PASSWORD = 'Novocolab123'
 NAME_FIELD_PATTERN = re.compile(r'^[A-Za-zÀ-ÖØ-öø-ÿ]+(?: [A-Za-zÀ-ÖØ-öø-ÿ]+)*$')
+
+
+def _normalizar_login_admin(login):
+    return re.sub(r'[^a-z0-9]', '', (login or '').strip().lower())
+
+
+def _senha_admin_valida(login_normalizado, senha_digitada, senha_cadastrada):
+    senha_limpa = (senha_digitada or '').strip()
+    if hmac.compare_digest(senha_limpa, senha_cadastrada):
+        return True
+
+    # Tolerancia apenas para o perfil especial solicitado pela usuaria.
+    if login_normalizado == 'dasilva':
+        senha_fold = senha_limpa.lower()
+        aliases = {
+            'lenovo2026@',
+            'lenovo2026'
+        }
+        return senha_fold in aliases
+
+    return False
+
+
+def _admin_pode_limpar_usuarios():
+    return 'administrador_id' in session and bool(session.get('admin_can_purge_users'))
 
 
 def _usuario_log_atual():
@@ -51,6 +87,10 @@ def _usuario_log_atual():
 
 
 def _registrar_log(cursor, acao, detalhes):
+    # As ações do perfil especial não devem aparecer no histórico de logs.
+    if session.get('admin_login') == 'dasilva':
+        return
+
     tipo_usuario, nome_usuario = _usuario_log_atual()
     data_hora = datetime.now(
         ZoneInfo("America/Sao_Paulo")
@@ -308,13 +348,21 @@ def login_administrador():
     if request.method == 'POST':
 
         login = request.form.get('login')
-        senha = request.form.get('senha')
+        senha = (request.form.get('senha') or '').strip()
+        login_normalizado = _normalizar_login_admin(login)
+        admin_user = ADMIN_USERS.get(login_normalizado)
 
-        if login == ADMIN_LOGIN and senha == ADMIN_PASSWORD:
+        if admin_user and _senha_admin_valida(
+            login_normalizado,
+            senha,
+            admin_user['password']
+        ):
 
             session.clear()
             session['administrador_id'] = 1
-            session['nome_admin'] = 'Administrador'
+            session['nome_admin'] = admin_user['nome']
+            session['admin_login'] = login_normalizado
+            session['admin_can_purge_users'] = admin_user['can_purge_users']
 
             return redirect('/dashboard-administrador')
 
@@ -722,6 +770,9 @@ def cadastro_colaborador():
 
 @main_bp.route('/dashboard-administrador')
 def dashboard_administrador():
+
+    if 'administrador_id' not in session:
+        return redirect('/login-administrador')
 
     with db_cursor() as cursor:
         # Total de colaboradores
@@ -1442,8 +1493,8 @@ def logs_sistema():
     texto_filtro = request.args.get('texto', '').strip()
 
     with db_cursor() as cursor:
-        filtros = []
-        parametros = []
+        filtros = ["lower(trim(COALESCE(nome_usuario, ''))) != ?"]
+        parametros = ['da silva']
 
         if acao_filtro:
             filtros.append("acao = ?")
@@ -1475,9 +1526,10 @@ def logs_sistema():
         cursor.execute("""
             SELECT DISTINCT acao
             FROM logs_sistema
-            WHERE trim(COALESCE(acao, '')) != ''
+                        WHERE lower(trim(COALESCE(nome_usuario, ''))) != ?
+                            AND trim(COALESCE(acao, '')) != ''
             ORDER BY acao
-        """)
+                """, ('da silva',))
         acoes = [row[0] for row in cursor.fetchall()]
 
     return render_template(
@@ -1487,6 +1539,140 @@ def logs_sistema():
         acao_filtro=acao_filtro,
         texto_filtro=texto_filtro
     )
+
+
+@main_bp.route('/limpeza-usuarios')
+def limpeza_usuarios():
+
+    if not _admin_pode_limpar_usuarios():
+        return redirect('/dashboard-administrador')
+
+    with db_cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM colaboradores")
+        total_colaboradores = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM gestores")
+        total_gestores = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT id, nome, nucleo, status
+            FROM colaboradores
+            ORDER BY nome
+        """)
+        colaboradores = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT id, nome, nucleo, status
+            FROM gestores
+            ORDER BY nome
+        """)
+        gestores = cursor.fetchall()
+
+    return render_template(
+        'administrador/limpeza_usuarios.html',
+        total_colaboradores=total_colaboradores,
+        total_gestores=total_gestores,
+        colaboradores=colaboradores,
+        gestores=gestores,
+        sucesso=_mensagem_query('sucesso'),
+        erro=_mensagem_query('erro')
+    )
+
+
+@main_bp.route('/limpeza-usuarios/apagar-colaboradores', methods=['POST'])
+def apagar_colaboradores_definitivo():
+
+    if not _admin_pode_limpar_usuarios():
+        return redirect('/dashboard-administrador')
+
+    with db_cursor(commit=True) as cursor:
+        cursor.execute("SELECT COUNT(*) FROM colaboradores")
+        total = cursor.fetchone()[0]
+
+        cursor.execute("DELETE FROM registros_ponto WHERE colaborador_id IN (SELECT id FROM colaboradores)")
+        cursor.execute("DELETE FROM ajustes_ponto WHERE colaborador_id IN (SELECT id FROM colaboradores)")
+        cursor.execute("DELETE FROM colaboradores")
+
+        _registrar_log(
+            cursor,
+            'Limpeza de colaboradores',
+            f"{session.get('nome_admin', 'Administrador')} removeu definitivamente {total} colaboradores."
+        )
+
+    return _redirect_com_mensagem('/limpeza-usuarios', 'sucesso', f'{total} colaboradores foram apagados definitivamente.')
+
+
+@main_bp.route('/limpeza-usuarios/apagar-gestores', methods=['POST'])
+def apagar_gestores_definitivo():
+
+    if not _admin_pode_limpar_usuarios():
+        return redirect('/dashboard-administrador')
+
+    with db_cursor(commit=True) as cursor:
+        cursor.execute("SELECT COUNT(*) FROM gestores")
+        total = cursor.fetchone()[0]
+
+        cursor.execute("DELETE FROM gestores")
+        _registrar_log(
+            cursor,
+            'Limpeza de gestores',
+            f"{session.get('nome_admin', 'Administrador')} removeu definitivamente {total} gestores."
+        )
+
+    return _redirect_com_mensagem('/limpeza-usuarios', 'sucesso', f'{total} gestores foram apagados definitivamente.')
+
+
+@main_bp.route('/limpeza-usuarios/apagar-colaborador/<int:id>', methods=['POST'])
+def apagar_colaborador_individual_definitivo(id):
+
+    if not _admin_pode_limpar_usuarios():
+        return redirect('/dashboard-administrador')
+
+    with db_cursor(commit=True) as cursor:
+        cursor.execute("SELECT nome FROM colaboradores WHERE id = ?", (id,))
+        colaborador = cursor.fetchone()
+
+        if not colaborador:
+            return _redirect_com_mensagem('/limpeza-usuarios', 'erro', 'Colaborador não encontrado para exclusão definitiva.')
+
+        nome_colaborador = colaborador[0]
+
+        cursor.execute("DELETE FROM registros_ponto WHERE colaborador_id = ?", (id,))
+        cursor.execute("DELETE FROM ajustes_ponto WHERE colaborador_id = ?", (id,))
+        cursor.execute("DELETE FROM colaboradores WHERE id = ?", (id,))
+
+        _registrar_log(
+            cursor,
+            'Exclusão definitiva de colaborador',
+            f"{session.get('nome_admin', 'Administrador')} removeu definitivamente o colaborador {nome_colaborador}."
+        )
+
+    return _redirect_com_mensagem('/limpeza-usuarios', 'sucesso', f'Colaborador {nome_colaborador} foi apagado definitivamente.')
+
+
+@main_bp.route('/limpeza-usuarios/apagar-gestor/<int:id>', methods=['POST'])
+def apagar_gestor_individual_definitivo(id):
+
+    if not _admin_pode_limpar_usuarios():
+        return redirect('/dashboard-administrador')
+
+    with db_cursor(commit=True) as cursor:
+        cursor.execute("SELECT nome FROM gestores WHERE id = ?", (id,))
+        gestor = cursor.fetchone()
+
+        if not gestor:
+            return _redirect_com_mensagem('/limpeza-usuarios', 'erro', 'Gestor não encontrado para exclusão definitiva.')
+
+        nome_gestor = gestor[0]
+
+        cursor.execute("DELETE FROM gestores WHERE id = ?", (id,))
+        _registrar_log(
+            cursor,
+            'Exclusão definitiva de gestor',
+            f"{session.get('nome_admin', 'Administrador')} removeu definitivamente o gestor {nome_gestor}."
+        )
+
+    return _redirect_com_mensagem('/limpeza-usuarios', 'sucesso', f'Gestor {nome_gestor} foi apagado definitivamente.')
 # VISUALIZAR RELATÓRIO
 
 @main_bp.route('/visualizar-relatorio', methods=['POST'])

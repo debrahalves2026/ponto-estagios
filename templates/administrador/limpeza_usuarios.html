@@ -1,0 +1,114 @@
+{% extends "base_administrador.html" %}
+
+{% block conteudo %}
+
+<h1>Limpeza de Cadastros</h1>
+
+<p>Esta área é exclusiva para o administrador autorizado e remove dados de forma definitiva.</p>
+
+{% if erro %}
+<p style="color:#b91c1c;"><strong>{{ erro }}</strong></p>
+{% endif %}
+
+{% if sucesso %}
+<p style="color:#166534;"><strong>{{ sucesso }}</strong></p>
+{% endif %}
+
+<hr>
+
+<p><strong>Total atual de colaboradores:</strong> {{ total_colaboradores }}</p>
+<p><strong>Total atual de gestores:</strong> {{ total_gestores }}</p>
+
+<div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:20px;">
+    <form method="POST" action="/limpeza-usuarios/apagar-colaboradores" onsubmit="return confirm('Tem certeza que deseja apagar definitivamente TODOS os colaboradores e seus registros de ponto/ajustes?');">
+        <button type="submit" style="background:#b91c1c; color:#fff; border:none; border-radius:6px; padding:10px 14px; cursor:pointer;">
+            Apagar todos os colaboradores
+        </button>
+    </form>
+
+    <form method="POST" action="/limpeza-usuarios/apagar-gestores" onsubmit="return confirm('Tem certeza que deseja apagar definitivamente TODOS os gestores?');">
+        <button type="submit" style="background:#b45309; color:#fff; border:none; border-radius:6px; padding:10px 14px; cursor:pointer;">
+            Apagar todos os gestores
+        </button>
+    </form>
+</div>
+
+<p style="margin-top:18px; color:#444;">
+    Dica: use esta limpeza apenas quando você realmente quiser reiniciar os cadastros.
+</p>
+
+<hr>
+
+<h2>Apagar colaborador individual</h2>
+<div style="overflow-x:auto; margin-top:10px;">
+    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse; background:#fff;">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Núcleo</th>
+                <th>Status</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if colaboradores %}
+                {% for colaborador in colaboradores %}
+                <tr>
+                    <td>{{ colaborador[1] }}</td>
+                    <td>{{ colaborador[2] or '—' }}</td>
+                    <td>{{ colaborador[3] }}</td>
+                    <td>
+                        <form method="POST" action="/limpeza-usuarios/apagar-colaborador/{{ colaborador[0] }}" onsubmit="return confirm('Confirma apagar definitivamente o colaborador {{ colaborador[1] }} e todos os seus registros?');">
+                            <button type="submit" style="background:#b91c1c; color:#fff; border:none; border-radius:6px; padding:8px 12px; cursor:pointer;">
+                                Apagar definitivo
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="4">Nenhum colaborador cadastrado.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<h2 style="margin-top:22px;">Apagar gestor individual</h2>
+<div style="overflow-x:auto; margin-top:10px;">
+    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse; background:#fff;">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Núcleo</th>
+                <th>Status</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if gestores %}
+                {% for gestor in gestores %}
+                <tr>
+                    <td>{{ gestor[1] }}</td>
+                    <td>{{ gestor[2] or '—' }}</td>
+                    <td>{{ gestor[3] }}</td>
+                    <td>
+                        <form method="POST" action="/limpeza-usuarios/apagar-gestor/{{ gestor[0] }}" onsubmit="return confirm('Confirma apagar definitivamente o gestor {{ gestor[1] }}?');">
+                            <button type="submit" style="background:#b45309; color:#fff; border:none; border-radius:6px; padding:8px 12px; cursor:pointer;">
+                                Apagar definitivo
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="4">Nenhum gestor cadastrado.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

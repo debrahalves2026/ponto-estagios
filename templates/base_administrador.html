@@ -46,6 +46,12 @@
         📜 Logs
     </a>
 
+    {% if session.get('admin_can_purge_users') %}
+    <a href="/limpeza-usuarios">
+        🧹 Limpeza de Cadastros
+    </a>
+    {% endif %}
+
     <a href="/">
         🚪 Sair
     </a>
