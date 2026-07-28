@@ -111,11 +111,13 @@
             }
         });
     }
-
-    {% if request.args.get('erro_logs') %}
-    alert('Credenciais de Logs inválidas.');
-    {% endif %}
 </script>
+
+{% if request.args.get('erro_logs') %}
+<script>
+    alert('Credenciais de Logs inválidas.');
+</script>
+{% endif %}
 
 </body>
 </html>
