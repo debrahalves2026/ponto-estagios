@@ -1923,49 +1923,60 @@ def salvar_colaborador():
             erro_nome or erro_monitor
         )
 
-    with db_cursor(commit=True) as cursor:
-        # Se for Gestor do Núcleo, usa automaticamente o núcleo dele
-        if 'gestor_id' in session:
-            nucleo = session['nucleo_gestor']
-        # Se for Administrador, permite escolher o núcleo
-        else:
-            nucleo = request.form['nucleo']
+    try:
+        with db_cursor(commit=True) as cursor:
+            # Se for Gestor do Núcleo, usa automaticamente o núcleo dele
+            if 'gestor_id' in session:
+                nucleo = session['nucleo_gestor']
+            # Se for Administrador, permite escolher o núcleo
+            else:
+                nucleo = request.form.get('nucleo', '')
 
-        cursor.execute("""
-            INSERT INTO colaboradores (
+            cursor.execute("""
+                INSERT INTO colaboradores (
+                    nome,
+                    vinculo,
+                    nucleo,
+                    turno,
+                    horario,
+                    presencial,
+                    unidade_exercicio,
+                    procurador_monitor,
+                    celular,
+                    login,
+                    senha
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
                 nome,
-                vinculo,
+                request.form.get('vinculo', ''),
                 nucleo,
-                turno,
-                horario,
-                presencial,
-                unidade_exercicio,
+                request.form.get('turno', ''),
+                request.form.get('horario', ''),
+                request.form.get('presencial', ''),
+                request.form.get('unidade_exercicio', ''),
                 procurador_monitor,
-                celular,
-                login,
-                senha
+                request.form.get('celular', ''),
+                request.form.get('login', ''),
+                request.form.get('senha', '')
+            ))
+            _registrar_log(
+                cursor,
+                'Cadastro de colaborador',
+                f"{session.get('nome_admin', 'Usuário')} cadastrou o colaborador {nome}."
             )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (
-        nome,
-        request.form['vinculo'],
-        nucleo,
-        request.form['turno'],
-        request.form['horario'],
-        request.form['presencial'],
-        request.form['unidade_exercicio'],
-        procurador_monitor,
-        request.form['celular'],
-        request.form['login'],
-        request.form['senha']
-    ))
-        _registrar_log(
-            cursor,
-            'Cadastro de colaborador',
-            f"{session.get('nome_admin', 'Usuário')} cadastrou o colaborador {nome}."
+        return redirect('/colaboradores-cadastrados')
+    except Exception as e:
+        erro_msg = 'Erro ao cadastrar colaborador.'
+        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+            erro_msg = 'Já existe um colaborador com este login.'
+        elif 'not null' in str(e).lower():
+            erro_msg = 'Preencha todos os campos obrigatórios.'
+        return _redirect_com_mensagem(
+            '/cadastro-colaborador',
+            'erro',
+            erro_msg
         )
-
-    return redirect('/colaboradores-cadastrados')
 # CANCELAR COLABORADOR
 
 @main_bp.route('/cancelar-colaborador/<int:id>', methods=['POST'])
@@ -1973,46 +1984,56 @@ def cancelar_colaborador(id):
 
     motivo = request.form.get('motivo_cancelamento', '').strip()
 
-    with db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT nome FROM colaboradores WHERE id = %s", (id,))
-        colaborador_info = cursor.fetchone()
-        cursor.execute("""
-        UPDATE colaboradores
-        SET status = 'Inativo', cancel_observacao = %s
-        WHERE id = %s
-    """, (
-        motivo,
-        id,
-    ))
-        _registrar_log(
-            cursor,
-            'Cancelamento de colaborador',
-            f"{session.get('nome_admin', 'Administrador')} cancelou o colaborador {(colaborador_info[0] if colaborador_info else id)}."
-        )
+    try:
+        with db_cursor(commit=True) as cursor:
+            cursor.execute("SELECT nome FROM colaboradores WHERE id = %s", (id,))
+            colaborador_info = cursor.fetchone()
+            if not colaborador_info:
+                return _redirect_com_mensagem('/colaboradores-cadastrados', 'erro', 'Colaborador não encontrado.')
 
-    return redirect('/colaboradores-cadastrados')
+            cursor.execute("""
+                UPDATE colaboradores
+                SET status = 'Inativo', cancel_observacao = %s
+                WHERE id = %s
+            """, (motivo, id))
+
+            _registrar_log(
+                cursor,
+                'Cancelamento de colaborador',
+                f"{session.get('nome_admin', 'Administrador')} cancelou o colaborador {colaborador_info[0]}."
+            )
+
+        return redirect('/colaboradores-cadastrados')
+    except Exception as e:
+        return _redirect_com_mensagem('/colaboradores-cadastrados', 'erro', 'Erro ao cancelar colaborador.')
 
 
 @main_bp.route('/recadastrar-colaborador/<int:id>', methods=['POST'])
 def recadastrar_colaborador(id):
 
-    with db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT nome FROM colaboradores WHERE id = %s", (id,))
-        colaborador_info = cursor.fetchone()
-        cursor.execute("""
-        UPDATE colaboradores
-        SET status = 'Ativo', cancel_observacao = NULL
-        WHERE id = %s
-    """, (
-        id,
-    ))
-        _registrar_log(
-            cursor,
-            'Recadastro de colaborador',
-            f"{session.get('nome_admin', 'Administrador')} reativou o colaborador {(colaborador_info[0] if colaborador_info else id)}."
-        )
+    try:
+        with db_cursor(commit=True) as cursor:
+            cursor.execute("SELECT nome FROM colaboradores WHERE id = %s", (id,))
+            colaborador_info = cursor.fetchone()
+            if not colaborador_info:
+                return _redirect_com_mensagem('/colaboradores-cadastrados', 'erro', 'Colaborador não encontrado.')
 
-    return redirect('/colaboradores-cadastrados')
+            cursor.execute("""
+                UPDATE colaboradores
+                SET status = 'Ativo', cancel_observacao = NULL
+                WHERE id = %s
+            """, (id,))
+
+            _registrar_log(
+                cursor,
+                'Reativação de colaborador',
+                f"Colaborador {colaborador_info[0]} foi reativado."
+            )
+
+        return redirect('/colaboradores-cadastrados')
+    except Exception as e:
+        return _redirect_com_mensagem('/colaboradores-cadastrados', 'erro', 'Erro ao reativar colaborador.')
+
 # EDITAR COLABORADOR
 
 @main_bp.route('/editar-colaborador/<int:id>')
@@ -2240,31 +2261,34 @@ def anexar_folha_assinada():
     if 'colaborador_id' not in session:
         return redirect('/login-colaborador')
 
-    arquivo = request.files.get('arquivo_folha')
-    if not arquivo or arquivo.filename == '':
+    try:
+        arquivo = request.files.get('arquivo_folha')
+        if not arquivo or arquivo.filename == '':
+            return redirect('/meu-relatorio?erro=Nenhum arquivo selecionado')
+
+        if not arquivo.filename.lower().endswith('.pdf'):
+            return redirect('/meu-relatorio?erro=Apenas arquivos PDF são permitidos')
+
+        pasta_upload = ensure_upload_folder()
+
+        nome_seguro = safe_filename(arquivo.filename)
+        nome_arquivo = f"{session['colaborador_id']}_{nome_seguro}"
+        caminho_arquivo = os.path.join(pasta_upload, nome_arquivo)
+        arquivo.save(caminho_arquivo)
+
+        with db_cursor(commit=True) as cursor:
+            cursor.execute("""
+                UPDATE colaboradores
+                SET folha_assinada_path = %s, folha_assinada_nome = %s
+                WHERE id = %s
+            """, (
+                caminho_arquivo,
+                nome_seguro,
+                session['colaborador_id']
+            ))
         return redirect('/meu-relatorio')
-
-    if not arquivo.filename.lower().endswith('.pdf'):
-        return redirect('/meu-relatorio')
-
-    pasta_upload = ensure_upload_folder()
-
-    nome_seguro = safe_filename(arquivo.filename)
-    nome_arquivo = f"{session['colaborador_id']}_{nome_seguro}"
-    caminho_arquivo = os.path.join(pasta_upload, nome_arquivo)
-    arquivo.save(caminho_arquivo)
-
-    with db_cursor(commit=True) as cursor:
-        cursor.execute("""
-        UPDATE colaboradores
-        SET folha_assinada_path = %s, folha_assinada_nome = %s
-        WHERE id = %s
-    """, (
-        caminho_arquivo,
-        nome_seguro,
-        session['colaborador_id']
-    ))
-    return redirect('/meu-relatorio')
+    except Exception as e:
+        return redirect('/meu-relatorio?erro=Erro ao anexar arquivo')
 
 
 @main_bp.route('/download-folhas-assinadas')
@@ -2391,21 +2415,46 @@ def salvar_observacao():
 
 @main_bp.route('/gerar-pdf')
 def gerar_pdf():
+    try:
+        colaborador_id = request.args.get('colaborador_id')
+        mes_selecionado = request.args.get('mes')
 
-    colaborador_id = request.args.get('colaborador_id')
-    mes_selecionado = request.args.get('mes')
+        if 'administrador_id' not in session and 'gestor_id' not in session and 'colaborador_id' not in session:
+            return redirect('/login-colaborador')
 
-    if 'administrador_id' not in session and 'gestor_id' not in session and 'colaborador_id' not in session:
-        return redirect('/login-colaborador')
+        with db_cursor() as cursor:
+            if 'administrador_id' in session or 'gestor_id' in session:
+                if not colaborador_id:
+                    return redirect('/relatorios')
 
-    with db_cursor() as cursor:
-        if 'administrador_id' in session or 'gestor_id' in session:
-            if not colaborador_id:
-                return redirect('/relatorios')
+                if colaborador_id == 'all':
+                    colaborador = ('Todos os Colaboradores', '', '')
+                else:
+                    cursor.execute("""
+                        SELECT
+                            nome,
+                            nucleo,
+                            horario
+                        FROM colaboradores
+                        WHERE id = %s
+                    """, (colaborador_id,))
+                    colaborador = cursor.fetchone()
 
-            if colaborador_id == 'all':
-                colaborador = ('Todos os Colaboradores', '', '')
+                    if not colaborador:
+                        return redirect('/relatorios')
+
+                    if 'gestor_id' in session:
+                        cursor.execute("""
+                            SELECT id
+                            FROM colaboradores
+                            WHERE id = %s
+                            AND nucleo = %s
+                        """, (colaborador_id, session['nucleo_gestor']))
+                        if not cursor.fetchone():
+                            return redirect('/relatorios')
+
             else:
+                colaborador_id = session['colaborador_id']
                 cursor.execute("""
                     SELECT
                         nome,
@@ -2416,353 +2465,331 @@ def gerar_pdf():
                 """, (colaborador_id,))
                 colaborador = cursor.fetchone()
 
-                if not colaborador:
-                    return redirect('/relatorios')
-
+            if colaborador_id == 'all':
+                filtro_nucleo = ""
+                parametros_extra = []
                 if 'gestor_id' in session:
-                    cursor.execute("""
-                        SELECT id
-                        FROM colaboradores
-                        WHERE id = %s
-                        AND nucleo = %s
-                    """, (colaborador_id, session['nucleo_gestor']))
-                    if not cursor.fetchone():
-                        return redirect('/relatorios')
+                    filtro_nucleo = " AND colaboradores.nucleo = %s"
+                    parametros_extra.append(session['nucleo_gestor'])
 
-        else:
-            colaborador_id = session['colaborador_id']
-            cursor.execute("""
-                SELECT
-                    nome,
-                    nucleo,
-                    horario
-                FROM colaboradores
-                WHERE id = %s
-            """, (colaborador_id,))
-            colaborador = cursor.fetchone()
+                if mes_selecionado and "-" in mes_selecionado:
+                    ano, mes = mes_selecionado.split('-')
+                    cursor.execute(f"""
+                    SELECT
+                        registros_ponto.data,
+                        registros_ponto.entrada,
+                        registros_ponto.saida_final,
+                        COALESCE(
+                            NULLIF(registros_ponto.observacao, ''),
+                            array_to_string(
+                                array_agg(
+                                    DISTINCT CASE
+                                        WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
+                                            THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                        WHEN trim(COALESCE(eventos.horario, '')) != ''
+                                            THEN trim(COALESCE(eventos.tipo, eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                        WHEN lower(trim(COALESCE(eventos.titulo, ''))) = lower(trim(COALESCE(eventos.tipo, '')))
+                                            THEN trim(COALESCE(eventos.tipo, eventos.titulo, ''))
+                                        ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
+                                    END
+                                ),
+                                '; '
+                            )
+                        ) AS observacao,
+                        colaboradores.nome
+                    FROM registros_ponto
+                    INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                    LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                        AND eventos.nucleo = colaboradores.nucleo
+                    WHERE substr(registros_ponto.data,4,2) = %s
+                    AND substr(registros_ponto.data,7,4) = %s
+                    {filtro_nucleo}
+                    GROUP BY registros_ponto.id, colaboradores.nome
+                    ORDER BY registros_ponto.data
+                    """, [mes, ano] + parametros_extra)
+                else:
+                    cursor.execute(f"""
+                        SELECT
+                            registros_ponto.data,
+                            registros_ponto.entrada,
+                            registros_ponto.saida_final,
+                            COALESCE(
+                                NULLIF(registros_ponto.observacao, ''),
+                                array_to_string(
+                                    array_agg(
+                                        DISTINCT CASE
+                                            WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
+                                                THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                            WHEN trim(COALESCE(eventos.horario, '')) != ''
+                                                THEN trim(COALESCE(eventos.tipo, eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
+                                            WHEN lower(trim(COALESCE(eventos.titulo, ''))) = lower(trim(COALESCE(eventos.tipo, '')))
+                                                THEN trim(COALESCE(eventos.tipo, eventos.titulo, ''))
+                                            ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
+                                        END
+                                    ),
+                                    '; '
+                                )
+                            ) AS observacao,
+                            colaboradores.nome
+                        FROM registros_ponto
+                        INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                        LEFT JOIN eventos ON eventos.data = registros_ponto.data
+                            AND eventos.nucleo = colaboradores.nucleo
+                        WHERE 1 = 1
+                        {filtro_nucleo}
+                        GROUP BY registros_ponto.id, colaboradores.nome
+                        ORDER BY registros_ponto.data
+                    """, parametros_extra)
+                registros = cursor.fetchall()
+                nome_colaborador = colaborador[0].replace(" ", "_")
 
-    print("MES PDF:", mes_selecionado)
+                if mes_selecionado and "-" in mes_selecionado:
+                    ano = mes_selecionado.split('-')[0]
+                    mes = mes_selecionado.split('-')[1]
+                    arquivo = f"Folha_Frequencia_Todos_Colaboradores_{mes}_{ano}.pdf"
+                else:
+                    arquivo = f"Folha_Frequencia_Todos_Colaboradores.pdf"
+            else:
+                if mes_selecionado and "-" in mes_selecionado:
+                    ano, mes = mes_selecionado.split('-')
+                    registros = _registros_folha_colaborador(
+                        cursor,
+                        colaborador_id,
+                        mes,
+                        ano,
+                        ordem='asc'
+                    )
+                else:
+                    registros = _registros_folha_colaborador(
+                        cursor,
+                        colaborador_id,
+                        ordem='asc'
+                    )
+                nome_colaborador = colaborador[0].replace(" ", "_")
 
-    if colaborador_id == 'all':
-        filtro_nucleo = ""
-        parametros_extra = []
-        if 'gestor_id' in session:
-            filtro_nucleo = " AND colaboradores.nucleo = %s"
-            parametros_extra.append(session['nucleo_gestor'])
+                if mes_selecionado and "-" in mes_selecionado:
+                    ano = mes_selecionado.split('-')[0]
+                    mes = mes_selecionado.split('-')[1]
+                    arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.pdf"
+                else:
+                    arquivo = f"Folha_Frequencia_{nome_colaborador}.pdf"
 
-        if mes_selecionado and "-" in mes_selecionado:
-            ano, mes = mes_selecionado.split('-')
-            cursor.execute(f"""
-                SELECT
-                    registros_ponto.data,
-                    registros_ponto.entrada,
-                    registros_ponto.saida_final,
-                    COALESCE(
-                        NULLIF(registros_ponto.observacao, ''),
-                        array_to_string(
-                            array_agg(
-                                DISTINCT CASE
-                                    WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
-                                        THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
-                                    WHEN trim(COALESCE(eventos.horario, '')) != ''
-                                        THEN trim(COALESCE(eventos.tipo, eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
-                                    WHEN lower(trim(COALESCE(eventos.titulo, ''))) = lower(trim(COALESCE(eventos.tipo, '')))
-                                        THEN trim(COALESCE(eventos.tipo, eventos.titulo, ''))
-                                    ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
-                                END
-                            ),
-                            '; '
-                        )
-                    ) AS observacao,
-                    colaboradores.nome
-                FROM registros_ponto
-                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                    AND eventos.nucleo = colaboradores.nucleo
-                WHERE substr(registros_ponto.data,4,2) = %s
-                AND substr(registros_ponto.data,7,4) = %s
-                {filtro_nucleo}
-                GROUP BY registros_ponto.id, colaboradores.nome
-                ORDER BY registros_ponto.data
-            """, [mes, ano] + parametros_extra)
-        else:
-            cursor.execute(f"""
-                SELECT
-                    registros_ponto.data,
-                    registros_ponto.entrada,
-                    registros_ponto.saida_final,
-                    COALESCE(
-                        NULLIF(registros_ponto.observacao, ''),
-                        array_to_string(
-                            array_agg(
-                                DISTINCT CASE
-                                    WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
-                                        THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
-                                    WHEN trim(COALESCE(eventos.horario, '')) != ''
-                                        THEN trim(COALESCE(eventos.tipo, eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
-                                    WHEN lower(trim(COALESCE(eventos.titulo, ''))) = lower(trim(COALESCE(eventos.tipo, '')))
-                                        THEN trim(COALESCE(eventos.tipo, eventos.titulo, ''))
-                                    ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
-                                END
-                            ),
-                            '; '
-                        )
-                    ) AS observacao,
-                    colaboradores.nome
-                FROM registros_ponto
-                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                LEFT JOIN eventos ON eventos.data = registros_ponto.data
-                    AND eventos.nucleo = colaboradores.nucleo
-                WHERE 1 = 1
-                {filtro_nucleo}
-                GROUP BY registros_ponto.id, colaboradores.nome
-                ORDER BY registros_ponto.data
-            """, parametros_extra)
-        registros = cursor.fetchall()
-        nome_colaborador = colaborador[0].replace(" ", "_")
-
-        if mes_selecionado and "-" in mes_selecionado:
-            ano = mes_selecionado.split('-')[0]
-            mes = mes_selecionado.split('-')[1]
-            arquivo = f"Folha_Frequencia_Todos_Colaboradores_{mes}_{ano}.pdf"
-        else:
-            arquivo = f"Folha_Frequencia_Todos_Colaboradores.pdf"
-    else:
-        if mes_selecionado and "-" in mes_selecionado:
-            ano, mes = mes_selecionado.split('-')
-            registros = _registros_folha_colaborador(
-                cursor,
-                colaborador_id,
-                mes,
-                ano,
-                ordem='asc'
-            )
-        else:
-            registros = _registros_folha_colaborador(
-                cursor,
-                colaborador_id,
-                ordem='asc'
-            )
-        nome_colaborador = colaborador[0].replace(" ", "_")
-
-        if mes_selecionado and "-" in mes_selecionado:
-            ano = mes_selecionado.split('-')[0]
-            mes = mes_selecionado.split('-')[1]
-            arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.pdf"
-        else:
-            arquivo = f"Folha_Frequencia_{nome_colaborador}.pdf"
-
-    if colaborador_id == 'all':
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-        temp_path = temp_file.name
-        temp_file.close()
-        doc = SimpleDocTemplate(temp_path)
-        estilos = getSampleStyleSheet()
-        elementos = []
-        elementos.append(
-            Paragraph(
-                "<b>FOLHA DE FREQUÊNCIA</b>",
-                estilos['Title']
-            )
-        )
-        if mes_selecionado and "-" in mes_selecionado:
+        if colaborador_id == 'all':
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            temp_path = temp_file.name
+            temp_file.close()
+            doc = SimpleDocTemplate(temp_path)
+            estilos = getSampleStyleSheet()
+            elementos = []
             elementos.append(
                 Paragraph(
-                    f"<b>Competência:</b> {mes}/{ano}",
+                    "<b>FOLHA DE FREQUÊNCIA</b>",
+                    estilos['Title']
+                )
+            )
+            if mes_selecionado and "-" in mes_selecionado:
+                elementos.append(
+                    Paragraph(
+                        f"<b>Competência:</b> {mes}/{ano}",
+                        estilos['Normal']
+                    )
+                )
+                elementos.append(Spacer(1, 12))
+            elementos.append(
+                Paragraph(
+                    f"<b>Relatório:</b> Todos os colaboradores",
+                    estilos['Normal']
+                )
+            )
+            elementos.append(Spacer(1, 20))
+            estilo_celula_tabela = ParagraphStyle(
+                name='CelulaTabelaPDF',
+                parent=estilos['Normal'],
+                fontSize=8,
+                leading=10,
+                wordWrap='CJK'
+            )
+            estilo_cabecalho_tabela = ParagraphStyle(
+                name='CabecalhoTabelaPDF',
+                parent=estilos['Normal'],
+                fontName='Helvetica-Bold',
+                fontSize=8,
+                leading=10,
+                alignment=1,
+                wordWrap='CJK'
+            )
+
+            dados = [
+                [
+                    _celula_pdf("Data", estilo_cabecalho_tabela),
+                    _celula_pdf("Entrada", estilo_cabecalho_tabela),
+                    _celula_pdf("Saída", estilo_cabecalho_tabela),
+                    _celula_pdf("Observação", estilo_cabecalho_tabela),
+                    _celula_pdf("Colaborador", estilo_cabecalho_tabela)
+                ]
+            ]
+            for registro in registros:
+                dados.append([
+                    _celula_pdf(registro[0], estilo_celula_tabela),
+                    _celula_pdf(registro[1] or "", estilo_celula_tabela),
+                    _celula_pdf(registro[2] or "", estilo_celula_tabela),
+                    _celula_pdf(registro[3] or "", estilo_celula_tabela),
+                    _celula_pdf(registro[4] or "", estilo_celula_tabela)
+                ])
+            tabela = Table(
+                dados,
+                colWidths=[64, 50, 50, 230, 126],
+                repeatRows=1
+            )
+            tabela.setStyle(TableStyle([
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+            elementos.append(tabela)
+            doc.build(elementos)
+        else:
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            temp_path = temp_file.name
+            temp_file.close()
+            doc = SimpleDocTemplate(
+                temp_path,
+                pagesize=A4,
+                leftMargin=24,
+                rightMargin=24,
+                topMargin=20,
+                bottomMargin=20
+            )
+            estilos = getSampleStyleSheet()
+            elementos = []
+            elementos.append(
+                Paragraph(
+                    "<b>FOLHA DE FREQUÊNCIA</b>",
+                    estilos['Title']
+                )
+            )
+            if mes_selecionado and "-" in mes_selecionado:
+                elementos.append(
+                    Paragraph(
+                        f"<b>Competência:</b> {mes}/{ano}",
+                        estilos['Normal']
+                    )
+                )
+                elementos.append(Spacer(1, 12))
+            elementos.append(
+                Paragraph(
+                    f"<b>Nome:</b> {colaborador[0]}",
+                    estilos['Normal']
+                )
+            )
+            elementos.append(
+                Paragraph(
+                    f"<b>Núcleo:</b> {colaborador[1]}",
+                    estilos['Normal']
+                )
+            )
+            elementos.append(
+                Paragraph(
+                    f"<b>Horário:</b> {colaborador[2]}",
                     estilos['Normal']
                 )
             )
             elementos.append(Spacer(1, 12))
-        elementos.append(
-            Paragraph(
-                f"<b>Relatório:</b> Todos os colaboradores",
-                estilos['Normal']
+            estilo_celula_tabela = ParagraphStyle(
+                name='CelulaTabelaPDF',
+                parent=estilos['Normal'],
+                fontSize=8,
+                leading=10,
+                wordWrap='CJK'
             )
-        )
-        elementos.append(Spacer(1, 20))
-        estilo_celula_tabela = ParagraphStyle(
-            name='CelulaTabelaPDF',
-            parent=estilos['Normal'],
-            fontSize=8,
-            leading=10,
-            wordWrap='CJK'
-        )
-        estilo_cabecalho_tabela = ParagraphStyle(
-            name='CabecalhoTabelaPDF',
-            parent=estilos['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=8,
-            leading=10,
-            alignment=1,
-            wordWrap='CJK'
-        )
+            estilo_cabecalho_tabela = ParagraphStyle(
+                name='CabecalhoTabelaPDF',
+                parent=estilos['Normal'],
+                fontName='Helvetica-Bold',
+                fontSize=8,
+                leading=10,
+                alignment=1,
+                wordWrap='CJK'
+            )
 
-        dados = [
-            [
-                _celula_pdf("Data", estilo_cabecalho_tabela),
-                _celula_pdf("Entrada", estilo_cabecalho_tabela),
-                _celula_pdf("Saída", estilo_cabecalho_tabela),
-                _celula_pdf("Observação", estilo_cabecalho_tabela),
-                _celula_pdf("Colaborador", estilo_cabecalho_tabela)
+            dados = [
+                [
+                    _celula_pdf("Data", estilo_cabecalho_tabela),
+                    _celula_pdf("Entrada", estilo_cabecalho_tabela),
+                    _celula_pdf("Saída", estilo_cabecalho_tabela),
+                    _celula_pdf("Observação", estilo_cabecalho_tabela)
+                ]
             ]
-        ]
-        for registro in registros:
-            dados.append([
-                _celula_pdf(registro[0], estilo_celula_tabela),
-                _celula_pdf(registro[1] or "", estilo_celula_tabela),
-                _celula_pdf(registro[2] or "", estilo_celula_tabela),
-                _celula_pdf(registro[3] or "", estilo_celula_tabela),
-                _celula_pdf(registro[4] or "", estilo_celula_tabela)
-            ])
-        tabela = Table(
-            dados,
-            colWidths=[64, 50, 50, 230, 126],
-            repeatRows=1
-        )
-        tabela.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        elementos.append(tabela)
-        doc.build(elementos)
-    else:
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-        temp_path = temp_file.name
-        temp_file.close()
-        doc = SimpleDocTemplate(
-            temp_path,
-            pagesize=A4,
-            leftMargin=24,
-            rightMargin=24,
-            topMargin=20,
-            bottomMargin=20
-        )
-        estilos = getSampleStyleSheet()
-        elementos = []
-        elementos.append(
-            Paragraph(
-                "<b>FOLHA DE FREQUÊNCIA</b>",
-                estilos['Title']
+            for registro in registros:
+                dados.append([
+                    _celula_pdf(registro[0], estilo_celula_tabela),
+                    _celula_pdf(registro[1] or "", estilo_celula_tabela),
+                    _celula_pdf(registro[2] or "", estilo_celula_tabela),
+                    _celula_pdf(registro[3] or "", estilo_celula_tabela)
+                ])
+            tabela = Table(
+                dados,
+                colWidths=[78, 58, 58, 120],
+                hAlign='CENTER',
+                repeatRows=1
             )
-        )
-        if mes_selecionado and "-" in mes_selecionado:
+            tabela.setStyle(TableStyle([
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('LEADING', (0, 0), (-1, -1), 10),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+            elementos.append(tabela)
+            elementos.append(Spacer(1, 20))
             elementos.append(
                 Paragraph(
-                    f"<b>Competência:</b> {mes}/{ano}",
-                    estilos['Normal']
+                    "<b>VISTO</b>",
+                    estilos['Title']
                 )
             )
             elementos.append(Spacer(1, 12))
-        elementos.append(
-            Paragraph(
-                f"<b>Nome:</b> {colaborador[0]}",
-                estilos['Normal']
-            )
-        )
-        elementos.append(
-            Paragraph(
-                f"<b>Núcleo:</b> {colaborador[1]}",
-                estilos['Normal']
-            )
-        )
-        elementos.append(
-            Paragraph(
-                f"<b>Horário:</b> {colaborador[2]}",
-                estilos['Normal']
-            )
-        )
-        elementos.append(Spacer(1, 12))
-        estilo_celula_tabela = ParagraphStyle(
-            name='CelulaTabelaPDF',
-            parent=estilos['Normal'],
-            fontSize=8,
-            leading=10,
-            wordWrap='CJK'
-        )
-        estilo_cabecalho_tabela = ParagraphStyle(
-            name='CabecalhoTabelaPDF',
-            parent=estilos['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=8,
-            leading=10,
-            alignment=1,
-            wordWrap='CJK'
-        )
+            assinaturas = Table([
+                [
+                    "__________________________________",
+                    "__________________________________"
+                ],
+                [
+                    colaborador[0],
+                    "ASSINATURA/CARIMBO"
+                ],
+                [
+                    "Relatório Abrangente",
+                    "PROCURADOR DO ESTADO"
+                ]
+            ], colWidths=[260, 260])
+            assinaturas.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+                ('FONTSIZE', (0,0), (-1,-1), 10),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ]))
+            elementos.append(assinaturas)
+            doc.build(elementos)
 
-        dados = [
-            [
-                _celula_pdf("Data", estilo_cabecalho_tabela),
-                _celula_pdf("Entrada", estilo_cabecalho_tabela),
-                _celula_pdf("Saída", estilo_cabecalho_tabela),
-                _celula_pdf("Observação", estilo_cabecalho_tabela)
-            ]
-        ]
-        for registro in registros:
-            dados.append([
-                _celula_pdf(registro[0], estilo_celula_tabela),
-                _celula_pdf(registro[1] or "", estilo_celula_tabela),
-                _celula_pdf(registro[2] or "", estilo_celula_tabela),
-                _celula_pdf(registro[3] or "", estilo_celula_tabela)
-            ])
-        tabela = Table(
-            dados,
-            colWidths=[78, 58, 58, 120],
-            hAlign='CENTER',
-            repeatRows=1
-        )
-        tabela.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('LEADING', (0, 0), (-1, -1), 10),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        elementos.append(tabela)
-        elementos.append(Spacer(1, 20))
-        elementos.append(
-            Paragraph(
-                "<b>VISTO</b>",
-                estilos['Title']
+            clean_temp_file(temp_path)
+
+            return send_file(
+                temp_path,
+                as_attachment=True,
+                download_name=arquivo,
+                mimetype='application/pdf'
             )
-        )
-        elementos.append(Spacer(1, 12))
-        assinaturas = Table([
-            [
-                "__________________________________",
-                "__________________________________"
-            ],
-            [
-                colaborador[0],
-                "ASSINATURA/CARIMBO"
-            ],
-            [
-                "Relatório Abrangente",
-                "PROCURADOR DO ESTADO"
-            ]
-        ], colWidths=[260, 260])
-        assinaturas.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-            ('FONTSIZE', (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ]))
-        elementos.append(assinaturas)
-        doc.build(elementos)
 
-    clean_temp_file(temp_path)
-
-    return send_file(
-        temp_path,
-        as_attachment=True,
-        download_name=arquivo,
-        mimetype='application/pdf'
-    )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return redirect('/relatorios?erro=Erro ao gerar PDF')
 
 @main_bp.route('/gerar-excel')
 def gerar_excel():
