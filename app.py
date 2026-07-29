@@ -19,7 +19,13 @@ if getattr(app_config, 'IS_EPHEMERAL_DB_RISK', False):
         'Configure SQLITE_DB_PATH ou RENDER_DISK_PATH para um disco persistente.'
     )
 
-criar_tabelas()
+try:
+    criar_tabelas()
+    print("✓ TABELAS CRIADAS COM SUCESSO NO BANCO DE DADOS")
+except Exception as e:
+    print(f"✗ ERRO AO CRIAR TABELAS: {e}")
+    import traceback
+    traceback.print_exc()
 
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=True, threaded=True)
