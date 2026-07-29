@@ -2793,21 +2793,43 @@ def gerar_pdf():
 
 @main_bp.route('/gerar-excel')
 def gerar_excel():
+    try:
+        colaborador_id = request.args.get('colaborador_id')
+        mes_selecionado = request.args.get('mes')
 
-    colaborador_id = request.args.get('colaborador_id')
-    mes_selecionado = request.args.get('mes')
+        if 'administrador_id' not in session and 'gestor_id' not in session and 'colaborador_id' not in session:
+            return redirect('/login-colaborador')
 
-    if 'administrador_id' not in session and 'gestor_id' not in session and 'colaborador_id' not in session:
-        return redirect('/login-colaborador')
+        with db_cursor() as cursor:
+            if 'administrador_id' in session or 'gestor_id' in session:
+                if not colaborador_id:
+                    return redirect('/relatorios')
 
-    with db_cursor() as cursor:
-        if 'administrador_id' in session or 'gestor_id' in session:
-            if not colaborador_id:
-                return redirect('/relatorios')
-
-            if colaborador_id == 'all':
-                colaborador = ('Todos os Colaboradores', '', '')
+                if colaborador_id == 'all':
+                    colaborador = ('Todos os Colaboradores', '', '')
+                else:
+                    cursor.execute("""
+                        SELECT
+                            nome,
+                            nucleo,
+                            horario
+                        FROM colaboradores
+                        WHERE id = %s
+                    """, (colaborador_id,))
+                    colaborador = cursor.fetchone()
+                    if not colaborador:
+                        return redirect('/relatorios')
+                    if 'gestor_id' in session:
+                        cursor.execute("""
+                            SELECT id
+                            FROM colaboradores
+                            WHERE id = %s
+                            AND nucleo = %s
+                        """, (colaborador_id, session['nucleo_gestor']))
+                        if not cursor.fetchone():
+                            return redirect('/relatorios')
             else:
+                colaborador_id = session['colaborador_id']
                 cursor.execute("""
                     SELECT
                         nome,
@@ -2817,173 +2839,152 @@ def gerar_excel():
                     WHERE id = %s
                 """, (colaborador_id,))
                 colaborador = cursor.fetchone()
-                if not colaborador:
-                    return redirect('/relatorios')
+
+            if colaborador_id == 'all':
+                filtro_nucleo = ""
+                parametros_extra = []
                 if 'gestor_id' in session:
-                    cursor.execute("""
-                        SELECT id
-                        FROM colaboradores
-                        WHERE id = %s
-                        AND nucleo = %s
-                    """, (colaborador_id, session['nucleo_gestor']))
-                    if not cursor.fetchone():
-                        return redirect('/relatorios')
-        else:
-            colaborador_id = session['colaborador_id']
-            cursor.execute("""
-                SELECT
-                    nome,
-                    nucleo,
-                    horario
-                FROM colaboradores
-                WHERE id = %s
-            """, (colaborador_id,))
-            colaborador = cursor.fetchone()
+                    filtro_nucleo = " AND colaboradores.nucleo = %s"
+                    parametros_extra.append(session['nucleo_gestor'])
 
-    print("MES EXCEL:", mes_selecionado)
+                if mes_selecionado and "-" in mes_selecionado:
+                    ano, mes = mes_selecionado.split('-')
+                    cursor.execute(f"""
+                        SELECT
+                            data,
+                            entrada,
+                            saida_final,
+                            observacao,
+                            colaboradores.nome
+                        FROM registros_ponto
+                        INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                        WHERE substr(registros_ponto.data,4,2) = %s
+                        AND substr(registros_ponto.data,7,4) = %s
+                        {filtro_nucleo}
+                        ORDER BY data
+                    """, [mes, ano] + parametros_extra)
+                else:
+                    cursor.execute(f"""
+                        SELECT
+                            data,
+                            entrada,
+                            saida_final,
+                            observacao,
+                            colaboradores.nome
+                        FROM registros_ponto
+                        INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
+                        WHERE 1 = 1
+                        {filtro_nucleo}
+                        ORDER BY data
+                    """, parametros_extra)
+                registros = cursor.fetchall()
+            else:
+                if mes_selecionado and "-" in mes_selecionado:
+                    ano, mes = mes_selecionado.split('-')
+                    registros = _registros_folha_colaborador(
+                        cursor,
+                        colaborador_id,
+                        mes,
+                        ano,
+                        ordem='asc'
+                    )
+                else:
+                    registros = _registros_folha_colaborador(
+                        cursor,
+                        colaborador_id,
+                        ordem='asc'
+                    )
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Frequência"
+        ws['A1'] = "FOLHA DE FREQUÊNCIA"
 
-    if colaborador_id == 'all':
-        filtro_nucleo = ""
-        parametros_extra = []
-        if 'gestor_id' in session:
-            filtro_nucleo = " AND colaboradores.nucleo = %s"
-            parametros_extra.append(session['nucleo_gestor'])
-
-        if mes_selecionado and "-" in mes_selecionado:
-            ano, mes = mes_selecionado.split('-')
-            cursor.execute(f"""
-                SELECT
-                    data,
-                    entrada,
-                    saida_final,
-                    observacao,
-                    colaboradores.nome
-                FROM registros_ponto
-                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                WHERE substr(registros_ponto.data,4,2) = %s
-                AND substr(registros_ponto.data,7,4) = %s
-                {filtro_nucleo}
-                ORDER BY data
-            """, [mes, ano] + parametros_extra)
-        else:
-            cursor.execute(f"""
-                SELECT
-                    data,
-                    entrada,
-                    saida_final,
-                    observacao,
-                    colaboradores.nome
-                FROM registros_ponto
-                INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                WHERE 1 = 1
-                {filtro_nucleo}
-                ORDER BY data
-            """, parametros_extra)
-    else:
-        if mes_selecionado and "-" in mes_selecionado:
-            ano, mes = mes_selecionado.split('-')
-            registros = _registros_folha_colaborador(
-                cursor,
-                colaborador_id,
-                mes,
-                ano,
-                ordem='asc'
-            )
-        else:
-            registros = _registros_folha_colaborador(
-                cursor,
-                colaborador_id,
-                ordem='asc'
-            )
-
-    if colaborador_id == 'all':
-        registros = cursor.fetchall()
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Frequência"
-    ws['A1'] = "FOLHA DE FREQUÊNCIA"
-
-    if colaborador_id == 'all':
-        if mes_selecionado and "-" in mes_selecionado:
-            ano = mes_selecionado.split('-')[0]
-            mes = mes_selecionado.split('-')[1]
-            ws['A2'] = f"Competência: {mes}/{ano}"
-        ws['A3'] = "Relatório"
-        ws['B3'] = "Todos os Colaboradores"
-        ws['A4'] = "Núcleo"
-        ws['B4'] = "Todos"
-        ws['A5'] = "Horário"
-        ws['B5'] = "Todos"
-        ws.append([])
-        ws.append([
-            "Data",
-            "Entrada",
-            "Saída",
-            "Observação",
-            "Colaborador"
-        ])
-        for registro in registros:
+        if colaborador_id == 'all':
+            if mes_selecionado and "-" in mes_selecionado:
+                ano = mes_selecionado.split('-')[0]
+                mes = mes_selecionado.split('-')[1]
+                ws['A2'] = f"Competência: {mes}/{ano}"
+            ws['A3'] = "Relatório"
+            ws['B3'] = "Todos os Colaboradores"
+            ws['A4'] = "Núcleo"
+            ws['B4'] = "Todos"
+            ws['A5'] = "Horário"
+            ws['B5'] = "Todos"
+            ws.append([])
             ws.append([
-                registro[0],
-                registro[1] or "",
-                registro[2] or "",
-                registro[3] or "",
-                registro[4] or ""
+                "Data",
+                "Entrada",
+                "Saída",
+                "Observação",
+                "Colaborador"
             ])
-        if mes_selecionado and "-" in mes_selecionado:
-            arquivo = f"Folha_Frequencia_Todos_Colaboradores_{mes}_{ano}.xlsx"
+            for registro in registros:
+                ws.append([
+                    registro[0],
+                    registro[1] or "",
+                    registro[2] or "",
+                    registro[3] or "",
+                    registro[4] or ""
+                ])
+            if mes_selecionado and "-" in mes_selecionado:
+                arquivo = f"Folha_Frequencia_Todos_Colaboradores_{mes}_{ano}.xlsx"
+            else:
+                arquivo = f"Folha_Frequencia_Todos_Colaboradores.xlsx"
         else:
-            arquivo = f"Folha_Frequencia_Todos_Colaboradores.xlsx"
-    else:
-        if mes_selecionado and "-" in mes_selecionado:
-            ano = mes_selecionado.split('-')[0]
-            mes = mes_selecionado.split('-')[1]
-            ws['A2'] = f"Competência: {mes}/{ano}"
-        ws['A3'] = "Nome"
-        ws['B3'] = colaborador[0]
-        ws['A4'] = "Núcleo"
-        ws['B4'] = colaborador[1]
-        ws['A5'] = "Horário"
-        ws['B5'] = colaborador[2]
-        ws.append([])
-        ws.append([
-            "Data",
-            "Entrada",
-            "Saída",
-            "Observação"
-        ])
-        for registro in registros:
+            if mes_selecionado and "-" in mes_selecionado:
+                ano = mes_selecionado.split('-')[0]
+                mes = mes_selecionado.split('-')[1]
+                ws['A2'] = f"Competência: {mes}/{ano}"
+            ws['A3'] = "Nome"
+            ws['B3'] = colaborador[0]
+            ws['A4'] = "Núcleo"
+            ws['B4'] = colaborador[1]
+            ws['A5'] = "Horário"
+            ws['B5'] = colaborador[2]
+            ws.append([])
             ws.append([
-                registro[0],
-                registro[1] or "",
-                registro[2] or "",
-                registro[3] or ""
+                "Data",
+                "Entrada",
+                "Saída",
+                "Observação"
             ])
-        nome_colaborador = colaborador[0].replace(" ", "_")
-        if mes_selecionado and "-" in mes_selecionado:
-            arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.xlsx"
-        else:
-            arquivo = f"Folha_Frequencia_{nome_colaborador}.xlsx"
+            for registro in registros:
+                ws.append([
+                    registro[0],
+                    registro[1] or "",
+                    registro[2] or "",
+                    registro[3] or ""
+                ])
+            nome_colaborador = colaborador[0].replace(" ", "_")
+            if mes_selecionado and "-" in mes_selecionado:
+                arquivo = f"Folha_Frequencia_{nome_colaborador}_{mes}_{ano}.xlsx"
+            else:
+                arquivo = f"Folha_Frequencia_{nome_colaborador}.xlsx"
 
-    for row in ws.iter_rows():
-        for cell in row:
-            cell.alignment = Alignment(
-                wrap_text=True,
-                vertical='top'
-            )
+        for row in ws.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(
+                    wrap_text=True,
+                    vertical='top'
+                )
 
-    temp_path = save_temp_file('.xlsx')
-    wb.save(temp_path)
+        temp_path = save_temp_file('.xlsx')
+        wb.save(temp_path)
 
-    clean_temp_file(temp_path)
+        clean_temp_file(temp_path)
 
-    return send_file(
-        temp_path,
-        as_attachment=True,
-        download_name=arquivo,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+        return send_file(
+            temp_path,
+            as_attachment=True,
+            download_name=arquivo,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
 
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return redirect('/relatorios?erro=Erro ao gerar Excel')
 @main_bp.route('/primeiro-acesso')
 def primeiro_acesso():
 
