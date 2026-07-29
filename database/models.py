@@ -99,6 +99,12 @@ def criar_tabelas():
     """)
 
     # Migracoes: adiciona colunas que podem nao existir em bancos ja criados
+    # Colunas de status críticas
+    _adicionar_coluna_se_ausente(cursor, 'colaboradores', 'status', 'TEXT DEFAULT \'Ativo\'')
+    _adicionar_coluna_se_ausente(cursor, 'gestores', 'status', 'TEXT DEFAULT \'Ativo\'')
+    _adicionar_coluna_se_ausente(cursor, 'ajustes_ponto', 'status', 'TEXT DEFAULT \'Pendente\'')
+    
+    # Outras colunas de migração
     _adicionar_coluna_se_ausente(cursor, 'colaboradores', 'cancel_observacao', 'TEXT')
     _adicionar_coluna_se_ausente(cursor, 'colaboradores', 'folha_assinada_path', 'TEXT')
     _adicionar_coluna_se_ausente(cursor, 'colaboradores', 'folha_assinada_nome', 'TEXT')
