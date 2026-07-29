@@ -48,7 +48,7 @@ ADMIN_USERS = {
     }
 }
 DEFAULT_USER_PASSWORD = 'Novocolab123'
-NAME_FIELD_PATTERN = re.compile(r'^[A-Za-zÀ-ÖØ-öø-ÿ]+(%s: [A-Za-zÀ-ÖØ-öø-ÿ]+)*$')
+NAME_FIELD_PATTERN = re.compile(r'^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$')
 
 
 def _normalizar_login_admin(login):
