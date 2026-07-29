@@ -51,6 +51,21 @@ DEFAULT_USER_PASSWORD = 'Novocolab123'
 NAME_FIELD_PATTERN = re.compile(r'^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$')
 
 
+def _validar_senha(senha):
+    """Valida força da senha. Retorna (válida, mensagem_erro)"""
+    if len(senha) < 8:
+        return False, "A senha deve ter no mínimo 8 caracteres."
+    if not any(c.islower() for c in senha):
+        return False, "A senha deve conter pelo menos uma letra minúscula."
+    if not any(c.isupper() for c in senha):
+        return False, "A senha deve conter pelo menos uma letra maiúscula."
+    if not any(c.isdigit() for c in senha):
+        return False, "A senha deve conter pelo menos um número."
+    if not any(c in '@$!%*&#' for c in senha):
+        return False, "A senha deve conter pelo menos um caractere especial (@$!%*&#)."
+    return True, ""
+
+
 def _normalizar_login_admin(login):
     return re.sub(r'[^a-z0-9]', '', (login or '').strip().lower())
 
@@ -381,39 +396,56 @@ def login_gestor_nucleo():
 
     if request.method == 'POST':
 
-        login = request.form.get('login')
-        senha = request.form.get('senha')
+        login = (request.form.get('login') or '').strip()
+        senha = (request.form.get('senha') or '').strip()
 
-        with db_cursor() as cursor:
-            cursor.execute("""
-            SELECT *
-            FROM gestores
-            WHERE login = %s
-            AND senha = %s
-            AND status = 'Ativo'
-        """, (
-            login,
-            senha
-        ))
+        if not login or not senha:
+            return render_template(
+                'gestor_nucleo/login_gestor_nucleo.html',
+                erro='Login e senha são obrigatórios.'
+            )
 
-        gestor = cursor.fetchone()
-        if gestor:
+        try:
+            with db_cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        id, nome, nucleo, unidade_exercicio, celular, login, senha, status
+                    FROM gestores
+                    WHERE login = %s
+                    AND status = 'Ativo'
+                """, (login,))
 
-            session.clear()
-            session['gestor_id'] = gestor[0]
-            session['nome_gestor'] = gestor[1]
-            session['nucleo_gestor'] = gestor[2]
+                gestor = cursor.fetchone()
+                if not gestor:
+                    return render_template(
+                        'gestor_nucleo/login_gestor_nucleo.html',
+                        erro='Login ou senha inválidos'
+                    )
 
-            # Primeiro acesso
-            if gestor[6] == DEFAULT_USER_PASSWORD:
-                return redirect('/primeiro-acesso-gestor')
+                # Verificar senha (índice 6)
+                if gestor[6] != senha:
+                    return render_template(
+                        'gestor_nucleo/login_gestor_nucleo.html',
+                        erro='Login ou senha inválidos'
+                    )
 
-            return redirect('/dashboard-gestor-nucleo')
+                # Login bem-sucedido
+                session.clear()
+                session['gestor_id'] = gestor[0]
+                session['nome_gestor'] = gestor[1]
+                session['nucleo_gestor'] = gestor[2]
 
-        return render_template(
-            'gestor_nucleo/login_gestor_nucleo.html',
-            erro='Login ou senha inválidos'
-        )
+                # Primeiro acesso (senha ainda é a padrão)
+                if gestor[6] == DEFAULT_USER_PASSWORD:
+                    return redirect('/primeiro-acesso-gestor')
+
+                return redirect('/dashboard-gestor-nucleo')
+
+        except Exception as e:
+            return render_template(
+                'gestor_nucleo/login_gestor_nucleo.html',
+                erro='Erro ao processar login. Tente novamente.'
+            )
 
     return render_template(
         'gestor_nucleo/login_gestor_nucleo.html'
@@ -712,37 +744,54 @@ def login_colaborador():
 
     if request.method == 'POST':
 
-        login = request.form.get('login')
-        senha = request.form.get('senha')
+        login = (request.form.get('login') or '').strip()
+        senha = (request.form.get('senha') or '').strip()
 
-        with db_cursor() as cursor:
-            cursor.execute("""
-            SELECT *
-            FROM colaboradores
-            WHERE login = %s
-            AND senha = %s
-            AND status = 'Ativo'
-        """, (
-            login,
-            senha
-        ))
+        if not login or not senha:
+            return render_template(
+                'colaborador/login_colaborador.html',
+                erro='Login e senha são obrigatórios.'
+            )
 
-        colaborador = cursor.fetchone()
-        if colaborador:
+        try:
+            with db_cursor() as cursor:
+                cursor.execute("""
+                    SELECT *
+                    FROM colaboradores
+                    WHERE login = %s
+                    AND status = 'Ativo'
+                """, (login,))
 
-            session.clear()
-            session['colaborador_id'] = colaborador[0]
-            session['nome'] = colaborador[1]
+                colaborador = cursor.fetchone()
+                if not colaborador:
+                    return render_template(
+                        'colaborador/login_colaborador.html',
+                        erro='Login ou senha inválidos'
+                    )
 
-            if colaborador[11] == DEFAULT_USER_PASSWORD:
-                return redirect('/primeiro-acesso')
+                # Verificar senha (índice 11 na tabela colaboradores)
+                if colaborador[11] != senha:
+                    return render_template(
+                        'colaborador/login_colaborador.html',
+                        erro='Login ou senha inválidos'
+                    )
 
-            return redirect('/ponto')
+                # Login bem-sucedido
+                session.clear()
+                session['colaborador_id'] = colaborador[0]
+                session['nome'] = colaborador[1]
 
-        return render_template(
-            'colaborador/login_colaborador.html',
-            erro='Login ou senha inválidos'
-        )
+                # Primeiro acesso (senha ainda é a padrão)
+                if colaborador[11] == DEFAULT_USER_PASSWORD:
+                    return redirect('/primeiro-acesso')
+
+                return redirect('/ponto')
+
+        except Exception as e:
+            return render_template(
+                'colaborador/login_colaborador.html',
+                erro='Erro ao processar login. Tente novamente.'
+            )
 
     return render_template(
         'colaborador/login_colaborador.html'
@@ -782,44 +831,44 @@ def dashboard_administrador():
         """)
         total_colaboradores = cursor.fetchone()[0]
 
-    # Colaboradores ativos
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM colaboradores
-        WHERE status = 'Ativo'
-    """)
-    colaboradores_ativos = cursor.fetchone()[0]
+        # Colaboradores ativos
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM colaboradores
+            WHERE status = 'Ativo'
+        """)
+        colaboradores_ativos = cursor.fetchone()[0]
 
-    # Colaboradores inativos
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM colaboradores
-        WHERE status = 'Inativo'
-    """)
-    colaboradores_inativos = cursor.fetchone()[0]
+        # Colaboradores inativos
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM colaboradores
+            WHERE status = 'Inativo'
+        """)
+        colaboradores_inativos = cursor.fetchone()[0]
 
-    # Total de gestores
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM gestores
-        WHERE status = 'Ativo'
-    """)
-    total_gestores = cursor.fetchone()[0]
+        # Total de gestores
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM gestores
+            WHERE status = 'Ativo'
+        """)
+        total_gestores = cursor.fetchone()[0]
 
-    # Total de núcleos
-    cursor.execute("""
-        SELECT COUNT(DISTINCT nucleo)
-        FROM colaboradores
-    """)
-    total_nucleos = cursor.fetchone()[0]
+        # Total de núcleos
+        cursor.execute("""
+            SELECT COUNT(DISTINCT nucleo)
+            FROM colaboradores
+        """)
+        total_nucleos = cursor.fetchone()[0]
 
-    # Ajustes pendentes
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM ajustes_ponto
-        WHERE status = 'Pendente'
-    """)
-    ajustes_pendentes = cursor.fetchone()[0]
+        # Ajustes pendentes
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM ajustes_ponto
+            WHERE status = 'Pendente'
+        """)
+        ajustes_pendentes = cursor.fetchone()[0]
     return render_template(
         'administrador/dashboard_administrador.html',
         total_colaboradores=total_colaboradores,
@@ -2937,18 +2986,10 @@ def alterar_senha():
         A senha padrão não pode ser utilizada novamente.
         """
 
-    padrao = r'^(%s=.*[a-z])(%s=.*[A-Z])(%s=.*\d)(%s=.*[@$!%*%s&]).{8,}$'
-
-    if not re.match(padrao, senha1):
-
-        return """
-        A senha deve possuir:
-
-            - mínimo de 8 caracteres;
-        - uma letra maiúscula;
-        - uma letra minúscula;
-        - um número;
-        - um caractere especial.
+    valida, erro = _validar_senha(senha1)
+    if not valida:
+        return f"""
+        Erro na senha: {erro}
         """
 
     with db_cursor(commit=True) as cursor:
@@ -3154,19 +3195,9 @@ def alterar_senha_gestor():
     if senha1 == DEFAULT_USER_PASSWORD:
         return "A senha padrão não pode ser utilizada novamente."
 
-    padrao = r'^(%s=.*[a-z])(%s=.*[A-Z])(%s=.*\d)(%s=.*[@$!%*%s&]).{8,}$'
-
-    if not re.match(padrao, senha1):
-
-        return """
-        A senha deve possuir:
-
-            - mínimo de 8 caracteres;
-        - uma letra maiúscula;
-        - uma letra minúscula;
-        - um número;
-        - um caractere especial.
-        """
+    valida, erro = _validar_senha(senha1)
+    if not valida:
+        return f"Erro na senha: {erro}"
 
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
