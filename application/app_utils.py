@@ -31,8 +31,16 @@ def db_cursor(commit=False):
             conn.commit()
     except Exception:
         if commit:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
         raise
+    finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
 
 
 def query_one(query, params=()):

@@ -116,5 +116,47 @@ def criar_tabelas():
     _adicionar_coluna_se_ausente(cursor, 'ajustes_ponto', 'data_analise', 'TEXT')
     _adicionar_coluna_se_ausente(cursor, 'eventos', 'horario', 'TEXT')
 
+    # Índices para melhor performance
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_colaboradores_status
+        ON colaboradores (status)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_colaboradores_login
+        ON colaboradores (login)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_colaboradores_nucleo
+        ON colaboradores (nucleo)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_gestores_login
+        ON gestores (login)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_registros_colaborador_id
+        ON registros_ponto (colaborador_id)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_registros_data
+        ON registros_ponto (data)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_ajustes_colaborador_id
+        ON ajustes_ponto (colaborador_id)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_ajustes_status
+        ON ajustes_ponto (status)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eventos_data
+        ON eventos (data)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eventos_nucleo
+        ON eventos (nucleo)
+    """)
+
     conn.commit()
     conn.close()
