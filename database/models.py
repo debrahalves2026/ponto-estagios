@@ -1,14 +1,24 @@
 from database.conexao import conectar
 
+
+def _adicionar_coluna_se_ausente(cursor, tabela, coluna, tipo):
+    cursor.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = %s AND column_name = %s
+    """, (tabela, coluna))
+    if not cursor.fetchone():
+        cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}")
+
+
 def criar_tabelas():
 
     conn = conectar()
-
     cursor = conn.cursor()
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS colaboradores (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         nome TEXT NOT NULL,
         vinculo TEXT,
         nucleo TEXT,
@@ -27,7 +37,7 @@ def criar_tabelas():
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS gestores (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         nome TEXT NOT NULL,
         nucleo TEXT,
         unidade_exercicio TEXT,
@@ -41,7 +51,7 @@ def criar_tabelas():
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS registros_ponto (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         colaborador_id INTEGER,
         data TEXT,
         entrada TEXT,
@@ -52,7 +62,7 @@ def criar_tabelas():
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ajustes_ponto (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         colaborador_id INTEGER,
         data TEXT,
         tipo_ajuste TEXT,
@@ -67,7 +77,7 @@ def criar_tabelas():
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS eventos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         titulo TEXT,
         tipo TEXT,
         data TEXT,
@@ -79,7 +89,7 @@ def criar_tabelas():
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS logs_sistema (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         data_hora TEXT NOT NULL,
         tipo_usuario TEXT,
         nome_usuario TEXT,
@@ -88,38 +98,17 @@ def criar_tabelas():
     )
     """)
 
-    cursor.execute("PRAGMA table_info(colaboradores)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'cancel_observacao' not in columns:
-        cursor.execute("ALTER TABLE colaboradores ADD COLUMN cancel_observacao TEXT")
-    if 'folha_assinada_path' not in columns:
-        cursor.execute("ALTER TABLE colaboradores ADD COLUMN folha_assinada_path TEXT")
-    if 'folha_assinada_nome' not in columns:
-        cursor.execute("ALTER TABLE colaboradores ADD COLUMN folha_assinada_nome TEXT")
-
-    cursor.execute("PRAGMA table_info(gestores)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'cancel_observacao' not in columns:
-        cursor.execute("ALTER TABLE gestores ADD COLUMN cancel_observacao TEXT")
-
-    cursor.execute("PRAGMA table_info(ajustes_ponto)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'tipo_ajuste' not in columns:
-        cursor.execute("ALTER TABLE ajustes_ponto ADD COLUMN tipo_ajuste TEXT")
-    if 'horario_correto' not in columns:
-        cursor.execute("ALTER TABLE ajustes_ponto ADD COLUMN horario_correto TEXT")
-    if 'motivo_reprovacao' not in columns:
-        cursor.execute("ALTER TABLE ajustes_ponto ADD COLUMN motivo_reprovacao TEXT")
-    if 'analisado_por' not in columns:
-        cursor.execute("ALTER TABLE ajustes_ponto ADD COLUMN analisado_por TEXT")
-    if 'data_analise' not in columns:
-        cursor.execute("ALTER TABLE ajustes_ponto ADD COLUMN data_analise TEXT")
-
-    cursor.execute("PRAGMA table_info(eventos)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'horario' not in columns:
-        cursor.execute("ALTER TABLE eventos ADD COLUMN horario TEXT")
+    # Migracoes: adiciona colunas que podem nao existir em bancos ja criados
+    _adicionar_coluna_se_ausente(cursor, 'colaboradores', 'cancel_observacao', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'colaboradores', 'folha_assinada_path', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'colaboradores', 'folha_assinada_nome', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'gestores', 'cancel_observacao', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'ajustes_ponto', 'tipo_ajuste', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'ajustes_ponto', 'horario_correto', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'ajustes_ponto', 'motivo_reprovacao', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'ajustes_ponto', 'analisado_por', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'ajustes_ponto', 'data_analise', 'TEXT')
+    _adicionar_coluna_se_ausente(cursor, 'eventos', 'horario', 'TEXT')
 
     conn.commit()
-
     conn.close()

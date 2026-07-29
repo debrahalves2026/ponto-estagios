@@ -1,6 +1,5 @@
 import os
 import re
-import sqlite3
 import tempfile
 from contextlib import contextmanager
 from functools import wraps
@@ -13,7 +12,6 @@ from database.conexao import conectar
 def get_db_connection():
     if not hasattr(g, 'db_conn'):
         g.db_conn = conectar()
-        g.db_conn.row_factory = sqlite3.Row
     return g.db_conn
 
 
@@ -39,26 +37,30 @@ def db_cursor(commit=False):
 
 def query_one(query, params=()):
     conn = get_db_connection()
-    cursor = conn.execute(query, params)
+    cursor = conn.cursor()
+    cursor.execute(query, params)
     return cursor.fetchone()
 
 
 def query_all(query, params=()):
     conn = get_db_connection()
-    cursor = conn.execute(query, params)
+    cursor = conn.cursor()
+    cursor.execute(query, params)
     return cursor.fetchall()
 
 
 def execute_query(query, params=()):
     conn = get_db_connection()
-    cursor = conn.execute(query, params)
+    cursor = conn.cursor()
+    cursor.execute(query, params)
     conn.commit()
     return cursor
 
 
 def execute_many(query, params_list):
     conn = get_db_connection()
-    cursor = conn.executemany(query, params_list)
+    cursor = conn.cursor()
+    cursor.executemany(query, params_list)
     conn.commit()
     return cursor
 

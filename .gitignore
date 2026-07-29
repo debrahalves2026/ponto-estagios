@@ -2,3 +2,6 @@
 __pycache__/
 .env
 *.pyc
+ponto.db
+ponto.db-wal
+ponto.db-shm

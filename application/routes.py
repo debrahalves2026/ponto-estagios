@@ -48,7 +48,7 @@ ADMIN_USERS = {
     }
 }
 DEFAULT_USER_PASSWORD = 'Novocolab123'
-NAME_FIELD_PATTERN = re.compile(r'^[A-Za-zÀ-ÖØ-öø-ÿ]+(?: [A-Za-zÀ-ÖØ-öø-ÿ]+)*$')
+NAME_FIELD_PATTERN = re.compile(r'^[A-Za-zÀ-ÖØ-öø-ÿ]+(%s: [A-Za-zÀ-ÖØ-öø-ÿ]+)*$')
 
 
 def _normalizar_login_admin(login):
@@ -103,7 +103,7 @@ def _registrar_log(cursor, acao, detalhes):
             acao,
             detalhes
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     """, (
         data_hora,
         tipo_usuario,
@@ -182,7 +182,7 @@ def _colaborador_nucleo(cursor, colaborador_id):
     cursor.execute("""
         SELECT nome, nucleo
         FROM colaboradores
-        WHERE id = ?
+        WHERE id = %s
     """, (colaborador_id,))
     return cursor.fetchone()
 
@@ -191,9 +191,9 @@ def _eh_feriado(cursor, data_br, nucleo):
     cursor.execute("""
         SELECT 1
         FROM eventos
-        WHERE data = ?
+        WHERE data = %s
         AND lower(trim(tipo)) = 'feriado'
-        AND (nucleo = ? OR nucleo IS NULL OR trim(nucleo) = '')
+        AND (nucleo = %s OR nucleo IS NULL OR trim(nucleo) = '')
         LIMIT 1
     """, (
         data_br,
@@ -207,7 +207,7 @@ def _datas_feriado_nucleo(cursor, nucleo):
         SELECT data
         FROM eventos
         WHERE lower(trim(tipo)) = 'feriado'
-        AND (nucleo = ? OR nucleo IS NULL OR trim(nucleo) = '')
+        AND (nucleo = %s OR nucleo IS NULL OR trim(nucleo) = '')
     """, (nucleo,))
 
     datas_iso = []
@@ -245,7 +245,7 @@ def _registros_folha_colaborador(cursor, colaborador_id, mes=None, ano=None, ord
     cursor.execute("""
         SELECT nucleo
         FROM colaboradores
-        WHERE id = ?
+        WHERE id = %s
     """, (colaborador_id,))
     colaborador = cursor.fetchone()
     nucleo = (colaborador[0] if colaborador else '') or ''
@@ -255,7 +255,7 @@ def _registros_folha_colaborador(cursor, colaborador_id, mes=None, ano=None, ord
     parametros_eventos = [nucleo]
 
     if mes and ano:
-        filtro_periodo = " AND substr(data,4,2) = ? AND substr(data,7,4) = ?"
+        filtro_periodo = " AND substr(data,4,2) = %s AND substr(data,7,4) = %s"
         parametros_registros.extend([mes, ano])
         parametros_eventos.extend([mes, ano])
 
@@ -266,7 +266,7 @@ def _registros_folha_colaborador(cursor, colaborador_id, mes=None, ano=None, ord
             saida_final,
             observacao
         FROM registros_ponto
-        WHERE colaborador_id = ?
+        WHERE colaborador_id = %s
         {filtro_periodo}
     """, parametros_registros)
     registros = cursor.fetchall()
@@ -278,7 +278,7 @@ def _registros_folha_colaborador(cursor, colaborador_id, mes=None, ano=None, ord
             titulo,
             COALESCE(horario, '')
         FROM eventos
-        WHERE (nucleo = ? OR nucleo IS NULL OR trim(nucleo) = '')
+        WHERE (nucleo = %s OR nucleo IS NULL OR trim(nucleo) = '')
         {filtro_periodo}
         ORDER BY data, horario, tipo, titulo
     """, parametros_eventos)
@@ -388,8 +388,8 @@ def login_gestor_nucleo():
             cursor.execute("""
             SELECT *
             FROM gestores
-            WHERE login = ?
-            AND senha = ?
+            WHERE login = %s
+            AND senha = %s
             AND status = 'Ativo'
         """, (
             login,
@@ -431,7 +431,7 @@ def dashboard_gestor_nucleo():
         cursor.execute("""
             SELECT COUNT(*)
             FROM colaboradores
-            WHERE nucleo = ?
+            WHERE nucleo = %s
         """, (
             session['nucleo_gestor'],
         ))
@@ -441,7 +441,7 @@ def dashboard_gestor_nucleo():
         cursor.execute("""
             SELECT COUNT(*)
             FROM colaboradores
-            WHERE nucleo = ?
+            WHERE nucleo = %s
             AND status = 'Ativo'
         """, (
             session['nucleo_gestor'],
@@ -452,7 +452,7 @@ def dashboard_gestor_nucleo():
         cursor.execute("""
             SELECT COUNT(*)
             FROM colaboradores
-            WHERE nucleo = ?
+            WHERE nucleo = %s
             AND status = 'Inativo'
         """, (
             session['nucleo_gestor'],
@@ -465,7 +465,7 @@ def dashboard_gestor_nucleo():
             FROM ajustes_ponto
             INNER JOIN colaboradores
             ON ajustes_ponto.colaborador_id = colaboradores.id
-            WHERE colaboradores.nucleo = ?
+            WHERE colaboradores.nucleo = %s
             AND ajustes_ponto.status = 'Pendente'
         """, (
             session['nucleo_gestor'],
@@ -529,7 +529,7 @@ def salvar_gestor():
                     login,
                     senha
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (
                 nome,
                 nucleo,
@@ -547,7 +547,7 @@ def salvar_gestor():
         return redirect('/gestores-cadastrados')
     except Exception as e:
         error_message = 'Erro ao cadastrar gestor. Verifique se o login já existe.'
-        if 'UNIQUE constraint failed' in str(e):
+        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
             error_message = 'Já existe um gestor cadastrado com esse login.'
 
         return render_template(
@@ -571,7 +571,7 @@ def editar_gestor(id):
         cursor.execute("""
         SELECT *
         FROM gestores
-        WHERE id = ?
+        WHERE id = %s
     """, (
         id,
     ))
@@ -600,10 +600,10 @@ def atualizar_gestor(id):
         cursor.execute("""
         UPDATE gestores
         SET
-            nome = ?,
-            nucleo = ?,
-            login = ?
-        WHERE id = ?
+            nome = %s,
+            nucleo = %s,
+            login = %s
+        WHERE id = %s
     """, (
         nome,
         request.form['nucleo'],
@@ -625,8 +625,8 @@ def cancelar_gestor(id):
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
         UPDATE gestores
-        SET status = 'Inativo', cancel_observacao = ?
-        WHERE id = ?
+        SET status = 'Inativo', cancel_observacao = %s
+        WHERE id = %s
     """, (
         motivo,
         id,
@@ -644,7 +644,7 @@ def recadastrar_gestor(id):
         cursor.execute("""
         UPDATE gestores
         SET status = 'Ativo', cancel_observacao = NULL
-        WHERE id = ?
+        WHERE id = %s
     """, (
         id,
     ))
@@ -660,8 +660,8 @@ def resetar_senha_gestor(id):
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
         UPDATE gestores
-        SET senha = ?
-        WHERE id = ?
+        SET senha = %s
+        WHERE id = %s
     """, (
         DEFAULT_USER_PASSWORD,
         id
@@ -678,8 +678,8 @@ def resetar_senha_colaborador(id):
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
         UPDATE colaboradores
-        SET senha = ?
-        WHERE id = ?
+        SET senha = %s
+        WHERE id = %s
     """, (
         DEFAULT_USER_PASSWORD,
         id
@@ -719,8 +719,8 @@ def login_colaborador():
             cursor.execute("""
             SELECT *
             FROM colaboradores
-            WHERE login = ?
-            AND senha = ?
+            WHERE login = %s
+            AND senha = %s
             AND status = 'Ativo'
         """, (
             login,
@@ -849,7 +849,7 @@ def colaboradores_cadastrados():
                 cursor.execute("""
                     SELECT *
                     FROM colaboradores
-                    WHERE nucleo = ?
+                    WHERE nucleo = %s
                     ORDER BY nome
                 """, (nucleo_filtro,))
             else:
@@ -871,7 +871,7 @@ def colaboradores_cadastrados():
             cursor.execute("""
                 SELECT *
                 FROM colaboradores
-                WHERE nucleo = ?
+                WHERE nucleo = %s
                 ORDER BY nome
             """, (session['nucleo_gestor'],))
             colaboradores = cursor.fetchall()
@@ -898,8 +898,8 @@ def ponto():
                 entrada,
                 saida_final
             FROM registros_ponto
-            WHERE colaborador_id = ?
-            AND data = ?
+            WHERE colaborador_id = %s
+            AND data = %s
         """, (
             session['colaborador_id'],
             data_hoje
@@ -909,7 +909,7 @@ def ponto():
         cursor.execute("""
             SELECT nucleo
             FROM colaboradores
-            WHERE id = ?
+            WHERE id = %s
         """, (session['colaborador_id'],))
         colaborador = cursor.fetchone()
 
@@ -954,7 +954,7 @@ def ajuste_ponto():
         cursor.execute("""
             SELECT nucleo
             FROM colaboradores
-            WHERE id = ?
+            WHERE id = %s
         """, (session['colaborador_id'],))
         colaborador = cursor.fetchone()
         nucleo = colaborador[0] if colaborador else ''
@@ -1016,7 +1016,7 @@ def solicitacoes_ajuste():
                 FROM ajustes_ponto
                 INNER JOIN colaboradores
                 ON ajustes_ponto.colaborador_id = colaboradores.id
-                WHERE colaboradores.nucleo = ?
+                WHERE colaboradores.nucleo = %s
                 ORDER BY ajustes_ponto.id DESC
             """, (
                 session['nucleo_gestor'],
@@ -1053,8 +1053,8 @@ def aprovar_ajuste(id):
                 FROM ajustes_ponto
                 INNER JOIN colaboradores
                 ON ajustes_ponto.colaborador_id = colaboradores.id
-                WHERE ajustes_ponto.id = ?
-                AND colaboradores.nucleo = ?
+                WHERE ajustes_ponto.id = %s
+                AND colaboradores.nucleo = %s
             """, (
                 id,
                 session['nucleo_gestor']
@@ -1074,7 +1074,7 @@ def aprovar_ajuste(id):
                 ajustes_ponto.horario_correto
             FROM ajustes_ponto
             INNER JOIN colaboradores ON colaboradores.id = ajustes_ponto.colaborador_id
-            WHERE ajustes_ponto.id = ?
+            WHERE ajustes_ponto.id = %s
         """, (id,))
         ajuste_info = cursor.fetchone()
 
@@ -1088,8 +1088,8 @@ def aprovar_ajuste(id):
             cursor.execute("""
                 SELECT id, entrada, saida_final
                 FROM registros_ponto
-                WHERE colaborador_id = ?
-                AND data = ?
+                WHERE colaborador_id = %s
+                AND data = %s
             """, (
                 colaborador_id,
                 data_ajuste
@@ -1108,8 +1108,8 @@ def aprovar_ajuste(id):
 
                 cursor.execute("""
                     UPDATE registros_ponto
-                    SET entrada = ?, saida_final = ?
-                    WHERE id = ?
+                    SET entrada = %s, saida_final = %s
+                    WHERE id = %s
                 """, (
                     nova_entrada,
                     nova_saida,
@@ -1126,7 +1126,7 @@ def aprovar_ajuste(id):
                         entrada,
                         saida_final
                     )
-                    VALUES (?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s)
                 """, (
                     colaborador_id,
                     data_ajuste,
@@ -1139,9 +1139,9 @@ def aprovar_ajuste(id):
             SET
                 status = 'Aprovado',
                 motivo_reprovacao = NULL,
-                analisado_por = ?,
-                data_analise = ?
-            WHERE id = ?
+                analisado_por = %s,
+                data_analise = %s
+            WHERE id = %s
         """, (
             _nome_reprovador(),
             _agora_sp().strftime('%d/%m/%Y %H:%M:%S'),
@@ -1175,8 +1175,8 @@ def reprovar_ajuste(id):
                 FROM ajustes_ponto
                 INNER JOIN colaboradores
                 ON ajustes_ponto.colaborador_id = colaboradores.id
-                WHERE ajustes_ponto.id = ?
-                AND colaboradores.nucleo = ?
+                WHERE ajustes_ponto.id = %s
+                AND colaboradores.nucleo = %s
             """, (
                 id,
                 session['nucleo_gestor']
@@ -1191,7 +1191,7 @@ def reprovar_ajuste(id):
             SELECT colaboradores.nome
             FROM ajustes_ponto
             INNER JOIN colaboradores ON colaboradores.id = ajustes_ponto.colaborador_id
-            WHERE ajustes_ponto.id = ?
+            WHERE ajustes_ponto.id = %s
         """, (id,))
         ajuste_info = cursor.fetchone()
         if ajuste_info:
@@ -1201,10 +1201,10 @@ def reprovar_ajuste(id):
             UPDATE ajustes_ponto
             SET
                 status = 'Reprovado',
-                motivo_reprovacao = ?,
-                analisado_por = ?,
-                data_analise = ?
-            WHERE id = ?
+                motivo_reprovacao = %s,
+                analisado_por = %s,
+                data_analise = %s
+            WHERE id = %s
         """, (
             motivo_reprovacao,
             _nome_reprovador(),
@@ -1238,7 +1238,7 @@ def meus_ajustes():
             analisado_por,
             data_analise
         FROM ajustes_ponto
-        WHERE colaborador_id = ?
+        WHERE colaborador_id = %s
         ORDER BY id DESC
     """, (
         session['colaborador_id'],
@@ -1262,7 +1262,7 @@ def calendario():
             cursor.execute("""
                 SELECT id, titulo, tipo, data, descricao, horario
                 FROM eventos
-                WHERE nucleo = ?
+                WHERE nucleo = %s
                 ORDER BY data, horario, id
             """, (
                 session['nucleo_gestor'],
@@ -1315,11 +1315,11 @@ def adicionar_evento():
         cursor.execute("""
             SELECT id
             FROM eventos
-            WHERE nucleo = ?
-              AND data = ?
-              AND tipo = ?
-              AND titulo = ?
-              AND COALESCE(horario, '') = ?
+            WHERE nucleo = %s
+              AND data = %s
+              AND tipo = %s
+              AND titulo = %s
+              AND COALESCE(horario, '') = %s
             LIMIT 1
         """, (
             session['nucleo_gestor'],
@@ -1339,7 +1339,7 @@ def adicionar_evento():
             descricao,
             nucleo,
             horario
-        ) VALUES (?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s)
     """, (
         titulo,
         tipo,
@@ -1365,8 +1365,8 @@ def apagar_evento():
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
         DELETE FROM eventos
-        WHERE id = ?
-        AND nucleo = ?
+        WHERE id = %s
+        AND nucleo = %s
     """, (
         evento_id,
         session['nucleo_gestor']
@@ -1388,7 +1388,7 @@ def _buscar_status_folhas(cursor, nucleo=None):
             SELECT id, nome, folha_assinada_path, folha_assinada_nome
             FROM colaboradores
             WHERE status = 'Ativo'
-            AND nucleo = ?
+            AND nucleo = %s
             ORDER BY nome
         """, (nucleo,))
 
@@ -1431,7 +1431,7 @@ def relatorios():
                 SELECT id, nome
                 FROM colaboradores
                 WHERE status = 'Ativo'
-                AND nucleo = ?
+                AND nucleo = %s
                 ORDER BY nome
             """, (
                 session['nucleo_gestor'],
@@ -1493,16 +1493,16 @@ def logs_sistema():
     texto_filtro = request.args.get('texto', '').strip()
 
     with db_cursor() as cursor:
-        filtros = ["lower(trim(COALESCE(nome_usuario, ''))) != ?"]
+        filtros = ["lower(trim(COALESCE(nome_usuario, ''))) != %s"]
         parametros = ['da silva']
 
         if acao_filtro:
-            filtros.append("acao = ?")
+            filtros.append("acao = %s")
             parametros.append(acao_filtro)
 
         if texto_filtro:
             termo = f"%{texto_filtro.lower()}%"
-            filtros.append("(lower(nome_usuario) LIKE ? OR lower(acao) LIKE ? OR lower(detalhes) LIKE ?)")
+            filtros.append("(lower(nome_usuario) LIKE %s OR lower(acao) LIKE %s OR lower(detalhes) LIKE %s)")
             parametros.extend([termo, termo, termo])
 
         where_sql = ''
@@ -1526,7 +1526,7 @@ def logs_sistema():
         cursor.execute("""
             SELECT DISTINCT acao
             FROM logs_sistema
-                        WHERE lower(trim(COALESCE(nome_usuario, ''))) != ?
+                        WHERE lower(trim(COALESCE(nome_usuario, ''))) != %s
                             AND trim(COALESCE(acao, '')) != ''
             ORDER BY acao
                 """, ('da silva',))
@@ -1629,7 +1629,7 @@ def apagar_colaborador_individual_definitivo(id):
         return redirect('/dashboard-administrador')
 
     with db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT nome FROM colaboradores WHERE id = ?", (id,))
+        cursor.execute("SELECT nome FROM colaboradores WHERE id = %s", (id,))
         colaborador = cursor.fetchone()
 
         if not colaborador:
@@ -1637,9 +1637,9 @@ def apagar_colaborador_individual_definitivo(id):
 
         nome_colaborador = colaborador[0]
 
-        cursor.execute("DELETE FROM registros_ponto WHERE colaborador_id = ?", (id,))
-        cursor.execute("DELETE FROM ajustes_ponto WHERE colaborador_id = ?", (id,))
-        cursor.execute("DELETE FROM colaboradores WHERE id = ?", (id,))
+        cursor.execute("DELETE FROM registros_ponto WHERE colaborador_id = %s", (id,))
+        cursor.execute("DELETE FROM ajustes_ponto WHERE colaborador_id = %s", (id,))
+        cursor.execute("DELETE FROM colaboradores WHERE id = %s", (id,))
 
         _registrar_log(
             cursor,
@@ -1657,7 +1657,7 @@ def apagar_gestor_individual_definitivo(id):
         return redirect('/dashboard-administrador')
 
     with db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT nome FROM gestores WHERE id = ?", (id,))
+        cursor.execute("SELECT nome FROM gestores WHERE id = %s", (id,))
         gestor = cursor.fetchone()
 
         if not gestor:
@@ -1665,7 +1665,7 @@ def apagar_gestor_individual_definitivo(id):
 
         nome_gestor = gestor[0]
 
-        cursor.execute("DELETE FROM gestores WHERE id = ?", (id,))
+        cursor.execute("DELETE FROM gestores WHERE id = %s", (id,))
         _registrar_log(
             cursor,
             'Exclusão definitiva de gestor',
@@ -1696,7 +1696,7 @@ def visualizar_relatorio():
                 SELECT id, nome
                 FROM colaboradores
                 WHERE status = 'Ativo'
-                AND nucleo = ?
+                AND nucleo = %s
                 ORDER BY nome
             """, (session['nucleo_gestor'],))
 
@@ -1711,8 +1711,8 @@ def visualizar_relatorio():
             cursor.execute("""
                 SELECT id
                 FROM colaboradores
-                WHERE id = ?
-                AND nucleo = ?
+                WHERE id = %s
+                AND nucleo = %s
             """, (
                 colaborador_id,
                 session['nucleo_gestor']
@@ -1747,7 +1747,7 @@ def visualizar_relatorio():
                 filtro_todos = ""
                 parametros = []
             elif 'gestor_id' in session:
-                filtro_todos = " AND colaboradores.nucleo = ?"
+                filtro_todos = " AND colaboradores.nucleo = %s"
                 parametros = [session['nucleo_gestor']]
             else:
                 return redirect('/login-administrador')
@@ -1760,8 +1760,8 @@ def visualizar_relatorio():
                         registros_ponto.saida_final,
                         COALESCE(
                             NULLIF(registros_ponto.observacao, ''),
-                            REPLACE(
-                                group_concat(
+                            array_to_string(
+                                array_agg(
                                     DISTINCT CASE
                                         WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
                                             THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
@@ -1772,7 +1772,6 @@ def visualizar_relatorio():
                                         ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
                                     END
                                 ),
-                                ',',
                                 '; '
                             )
                         ) AS observacao,
@@ -1781,10 +1780,10 @@ def visualizar_relatorio():
                     INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
                     LEFT JOIN eventos ON eventos.data = registros_ponto.data
                         AND eventos.nucleo = colaboradores.nucleo
-                    WHERE substr(registros_ponto.data,4,2) = ?
-                    AND substr(registros_ponto.data,7,4) = ?
+                    WHERE substr(registros_ponto.data,4,2) = %s
+                    AND substr(registros_ponto.data,7,4) = %s
                     {filtro_todos}
-                    GROUP BY registros_ponto.id
+                    GROUP BY registros_ponto.id, colaboradores.nome
                     ORDER BY registros_ponto.id DESC
                 """, [mes_num, ano] + parametros)
             else:
@@ -1795,8 +1794,8 @@ def visualizar_relatorio():
                         registros_ponto.saida_final,
                         COALESCE(
                             NULLIF(registros_ponto.observacao, ''),
-                            REPLACE(
-                                group_concat(
+                            array_to_string(
+                                array_agg(
                                     DISTINCT CASE
                                         WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
                                             THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
@@ -1807,7 +1806,6 @@ def visualizar_relatorio():
                                         ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
                                     END
                                 ),
-                                ',',
                                 '; '
                             )
                         ) AS observacao,
@@ -1818,7 +1816,7 @@ def visualizar_relatorio():
                         AND eventos.nucleo = colaboradores.nucleo
                     WHERE 1 = 1
                     {filtro_todos}
-                    GROUP BY registros_ponto.id
+                    GROUP BY registros_ponto.id, colaboradores.nome
                     ORDER BY registros_ponto.id DESC
                 """, parametros)
 
@@ -1837,7 +1835,7 @@ def visualizar_relatorio():
             cursor.execute("""
                 SELECT nome
                 FROM colaboradores
-                WHERE id = ?
+                WHERE id = %s
             """, (colaborador_id,))
             nome_colaborador_row = cursor.fetchone()
             nome_colaborador = nome_colaborador_row[0] if nome_colaborador_row else 'Colaborador'
@@ -1898,7 +1896,7 @@ def salvar_colaborador():
                 login,
                 senha
             )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         nome,
         request.form['vinculo'],
@@ -1927,12 +1925,12 @@ def cancelar_colaborador(id):
     motivo = request.form.get('motivo_cancelamento', '').strip()
 
     with db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT nome FROM colaboradores WHERE id = ?", (id,))
+        cursor.execute("SELECT nome FROM colaboradores WHERE id = %s", (id,))
         colaborador_info = cursor.fetchone()
         cursor.execute("""
         UPDATE colaboradores
-        SET status = 'Inativo', cancel_observacao = ?
-        WHERE id = ?
+        SET status = 'Inativo', cancel_observacao = %s
+        WHERE id = %s
     """, (
         motivo,
         id,
@@ -1950,12 +1948,12 @@ def cancelar_colaborador(id):
 def recadastrar_colaborador(id):
 
     with db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT nome FROM colaboradores WHERE id = ?", (id,))
+        cursor.execute("SELECT nome FROM colaboradores WHERE id = %s", (id,))
         colaborador_info = cursor.fetchone()
         cursor.execute("""
         UPDATE colaboradores
         SET status = 'Ativo', cancel_observacao = NULL
-        WHERE id = ?
+        WHERE id = %s
     """, (
         id,
     ))
@@ -1975,7 +1973,7 @@ def editar_colaborador(id):
         cursor.execute("""
         SELECT *
         FROM colaboradores
-        WHERE id = ?
+        WHERE id = %s
     """, (
         id,
     ))
@@ -2001,12 +1999,12 @@ def atualizar_colaborador(id):
         cursor.execute("""
         UPDATE colaboradores
         SET
-            nome = ?,
-            nucleo = ?,
-            turno = ?,
-            horario = ?,
-            celular = ?
-        WHERE id = ?
+            nome = %s,
+            nucleo = %s,
+            turno = %s,
+            horario = %s,
+            celular = %s
+        WHERE id = %s
     """, (
         nome,
         request.form['nucleo'],
@@ -2032,7 +2030,7 @@ def registrar_entrada():
         cursor.execute("""
             SELECT nucleo
             FROM colaboradores
-            WHERE id = ?
+            WHERE id = %s
         """, (session['colaborador_id'],))
         colaborador = cursor.fetchone()
         bloqueio = _bloqueio_trabalho(
@@ -2046,8 +2044,8 @@ def registrar_entrada():
         cursor.execute("""
             SELECT id, entrada, saida_final
             FROM registros_ponto
-            WHERE colaborador_id = ?
-            AND data = ?
+            WHERE colaborador_id = %s
+            AND data = %s
         """, (session['colaborador_id'], data_hoje))
 
         registro = cursor.fetchone()
@@ -2059,7 +2057,7 @@ def registrar_entrada():
                     data,
                     entrada
                 )
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
             """, (
                 session['colaborador_id'],
                 data_hoje,
@@ -2075,8 +2073,8 @@ def registrar_entrada():
             if not (entrada_salva or '').strip():
                 cursor.execute("""
                     UPDATE registros_ponto
-                    SET entrada = ?
-                    WHERE id = ?
+                    SET entrada = %s
+                    WHERE id = %s
                 """, (
                     hora_atual,
                     registro_id
@@ -2102,7 +2100,7 @@ def registrar_saida_final():
         cursor.execute("""
             SELECT nucleo
             FROM colaboradores
-            WHERE id = ?
+            WHERE id = %s
         """, (session['colaborador_id'],))
         colaborador = cursor.fetchone()
         bloqueio = _bloqueio_trabalho(
@@ -2116,8 +2114,8 @@ def registrar_saida_final():
         cursor.execute("""
             SELECT id, entrada, saida_final
             FROM registros_ponto
-            WHERE colaborador_id = ?
-            AND data = ?
+            WHERE colaborador_id = %s
+            AND data = %s
         """, (
             session['colaborador_id'],
             data_hoje
@@ -2130,8 +2128,8 @@ def registrar_saida_final():
             if not (saida_salva or '').strip():
                 cursor.execute("""
                     UPDATE registros_ponto
-                    SET saida_final = ?
-                    WHERE id = ?
+                    SET saida_final = %s
+                    WHERE id = %s
                 """, (
                     hora_atual,
                     registro_id
@@ -2168,7 +2166,7 @@ def meu_relatorio():
         cursor.execute("""
             SELECT folha_assinada_nome
             FROM colaboradores
-            WHERE id = ?
+            WHERE id = %s
         """, (session['colaborador_id'],))
         folha_assinada = cursor.fetchone()
 
@@ -2210,8 +2208,8 @@ def anexar_folha_assinada():
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
         UPDATE colaboradores
-        SET folha_assinada_path = ?, folha_assinada_nome = ?
-        WHERE id = ?
+        SET folha_assinada_path = %s, folha_assinada_nome = %s
+        WHERE id = %s
     """, (
         caminho_arquivo,
         nome_seguro,
@@ -2232,7 +2230,7 @@ def download_folhas_assinadas():
                 SELECT id, nome, folha_assinada_path
                 FROM colaboradores
                 WHERE status = 'Ativo'
-                AND nucleo = ?
+                AND nucleo = %s
                 AND folha_assinada_path IS NOT NULL
                 AND trim(folha_assinada_path) != ''
                 ORDER BY nome
@@ -2279,8 +2277,8 @@ def download_folha_assinada_individual(colaborador_id):
             cursor.execute("""
                 SELECT nome, folha_assinada_path, folha_assinada_nome
                 FROM colaboradores
-                WHERE id = ?
-                AND nucleo = ?
+                WHERE id = %s
+                AND nucleo = %s
             """, (
                 colaborador_id,
                 session['nucleo_gestor']
@@ -2289,7 +2287,7 @@ def download_folha_assinada_individual(colaborador_id):
             cursor.execute("""
                 SELECT nome, folha_assinada_path, folha_assinada_nome
                 FROM colaboradores
-                WHERE id = ?
+                WHERE id = %s
             """, (colaborador_id,))
 
         colaborador = cursor.fetchone()
@@ -2326,9 +2324,9 @@ def salvar_observacao():
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
             UPDATE registros_ponto
-            SET observacao = ?
-            WHERE colaborador_id = ?
-            AND data = ?
+            SET observacao = %s
+            WHERE colaborador_id = %s
+            AND data = %s
         """, (
             observacao,
             session['colaborador_id'],
@@ -2365,7 +2363,7 @@ def gerar_pdf():
                         nucleo,
                         horario
                     FROM colaboradores
-                    WHERE id = ?
+                    WHERE id = %s
                 """, (colaborador_id,))
                 colaborador = cursor.fetchone()
 
@@ -2376,8 +2374,8 @@ def gerar_pdf():
                     cursor.execute("""
                         SELECT id
                         FROM colaboradores
-                        WHERE id = ?
-                        AND nucleo = ?
+                        WHERE id = %s
+                        AND nucleo = %s
                     """, (colaborador_id, session['nucleo_gestor']))
                     if not cursor.fetchone():
                         return redirect('/relatorios')
@@ -2390,7 +2388,7 @@ def gerar_pdf():
                     nucleo,
                     horario
                 FROM colaboradores
-                WHERE id = ?
+                WHERE id = %s
             """, (colaborador_id,))
             colaborador = cursor.fetchone()
 
@@ -2400,7 +2398,7 @@ def gerar_pdf():
         filtro_nucleo = ""
         parametros_extra = []
         if 'gestor_id' in session:
-            filtro_nucleo = " AND colaboradores.nucleo = ?"
+            filtro_nucleo = " AND colaboradores.nucleo = %s"
             parametros_extra.append(session['nucleo_gestor'])
 
         if mes_selecionado and "-" in mes_selecionado:
@@ -2412,8 +2410,8 @@ def gerar_pdf():
                     registros_ponto.saida_final,
                     COALESCE(
                         NULLIF(registros_ponto.observacao, ''),
-                        REPLACE(
-                            group_concat(
+                        array_to_string(
+                            array_agg(
                                 DISTINCT CASE
                                     WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
                                         THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
@@ -2424,7 +2422,6 @@ def gerar_pdf():
                                     ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
                                 END
                             ),
-                            ',',
                             '; '
                         )
                     ) AS observacao,
@@ -2433,10 +2430,10 @@ def gerar_pdf():
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
                 LEFT JOIN eventos ON eventos.data = registros_ponto.data
                     AND eventos.nucleo = colaboradores.nucleo
-                WHERE substr(registros_ponto.data,4,2) = ?
-                AND substr(registros_ponto.data,7,4) = ?
+                WHERE substr(registros_ponto.data,4,2) = %s
+                AND substr(registros_ponto.data,7,4) = %s
                 {filtro_nucleo}
-                GROUP BY registros_ponto.id
+                GROUP BY registros_ponto.id, colaboradores.nome
                 ORDER BY registros_ponto.data
             """, [mes, ano] + parametros_extra)
         else:
@@ -2447,8 +2444,8 @@ def gerar_pdf():
                     registros_ponto.saida_final,
                     COALESCE(
                         NULLIF(registros_ponto.observacao, ''),
-                        REPLACE(
-                            group_concat(
+                        array_to_string(
+                            array_agg(
                                 DISTINCT CASE
                                     WHEN trim(COALESCE(eventos.horario, '')) != '' AND lower(trim(COALESCE(eventos.titulo, ''))) != lower(trim(COALESCE(eventos.tipo, '')))
                                         THEN trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, '')) || ' (' || trim(eventos.horario) || ')'
@@ -2459,7 +2456,6 @@ def gerar_pdf():
                                     ELSE trim(COALESCE(eventos.tipo, '')) || ' - ' || trim(COALESCE(eventos.titulo, ''))
                                 END
                             ),
-                            ',',
                             '; '
                         )
                     ) AS observacao,
@@ -2470,7 +2466,7 @@ def gerar_pdf():
                     AND eventos.nucleo = colaboradores.nucleo
                 WHERE 1 = 1
                 {filtro_nucleo}
-                GROUP BY registros_ponto.id
+                GROUP BY registros_ponto.id, colaboradores.nome
                 ORDER BY registros_ponto.data
             """, parametros_extra)
         registros = cursor.fetchall()
@@ -2742,7 +2738,7 @@ def gerar_excel():
                         nucleo,
                         horario
                     FROM colaboradores
-                    WHERE id = ?
+                    WHERE id = %s
                 """, (colaborador_id,))
                 colaborador = cursor.fetchone()
                 if not colaborador:
@@ -2751,8 +2747,8 @@ def gerar_excel():
                     cursor.execute("""
                         SELECT id
                         FROM colaboradores
-                        WHERE id = ?
-                        AND nucleo = ?
+                        WHERE id = %s
+                        AND nucleo = %s
                     """, (colaborador_id, session['nucleo_gestor']))
                     if not cursor.fetchone():
                         return redirect('/relatorios')
@@ -2764,7 +2760,7 @@ def gerar_excel():
                     nucleo,
                     horario
                 FROM colaboradores
-                WHERE id = ?
+                WHERE id = %s
             """, (colaborador_id,))
             colaborador = cursor.fetchone()
 
@@ -2774,7 +2770,7 @@ def gerar_excel():
         filtro_nucleo = ""
         parametros_extra = []
         if 'gestor_id' in session:
-            filtro_nucleo = " AND colaboradores.nucleo = ?"
+            filtro_nucleo = " AND colaboradores.nucleo = %s"
             parametros_extra.append(session['nucleo_gestor'])
 
         if mes_selecionado and "-" in mes_selecionado:
@@ -2788,8 +2784,8 @@ def gerar_excel():
                     colaboradores.nome
                 FROM registros_ponto
                 INNER JOIN colaboradores ON colaboradores.id = registros_ponto.colaborador_id
-                WHERE substr(registros_ponto.data,4,2) = ?
-                AND substr(registros_ponto.data,7,4) = ?
+                WHERE substr(registros_ponto.data,4,2) = %s
+                AND substr(registros_ponto.data,7,4) = %s
                 {filtro_nucleo}
                 ORDER BY data
             """, [mes, ano] + parametros_extra)
@@ -2941,7 +2937,7 @@ def alterar_senha():
         A senha padrão não pode ser utilizada novamente.
         """
 
-    padrao = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$'
+    padrao = r'^(%s=.*[a-z])(%s=.*[A-Z])(%s=.*\d)(%s=.*[@$!%*%s&]).{8,}$'
 
     if not re.match(padrao, senha1):
 
@@ -2958,8 +2954,8 @@ def alterar_senha():
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
         UPDATE colaboradores
-        SET senha = ?
-        WHERE id = ?
+        SET senha = %s
+        WHERE id = %s
     """, (
         senha1,
         session['colaborador_id']
@@ -3017,7 +3013,7 @@ def salvar_lancamento_ponto():
     data_formatada = _data_iso_para_br(data)
 
     with db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT nome, nucleo FROM colaboradores WHERE id = ?", (colaborador_id,))
+        cursor.execute("SELECT nome, nucleo FROM colaboradores WHERE id = %s", (colaborador_id,))
         colaborador_info = cursor.fetchone()
         bloqueio = _bloqueio_trabalho(
             cursor,
@@ -3030,8 +3026,8 @@ def salvar_lancamento_ponto():
         cursor.execute("""
             SELECT id
             FROM registros_ponto
-            WHERE colaborador_id = ?
-            AND data = ?
+            WHERE colaborador_id = %s
+            AND data = %s
         """, (
             colaborador_id,
             data_formatada
@@ -3042,10 +3038,10 @@ def salvar_lancamento_ponto():
             cursor.execute("""
                 UPDATE registros_ponto
                 SET
-                    entrada = ?,
-                    saida_final = ?,
-                    observacao = ?
-                WHERE id = ?
+                    entrada = %s,
+                    saida_final = %s,
+                    observacao = %s
+                WHERE id = %s
             """, (
                 entrada,
                 saida_final,
@@ -3061,7 +3057,7 @@ def salvar_lancamento_ponto():
                 saida_final,
                 observacao
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         """, (
             colaborador_id,
             data_formatada,
@@ -3095,7 +3091,7 @@ def enviar_ajuste():
         cursor.execute("""
             SELECT nucleo
             FROM colaboradores
-            WHERE id = ?
+            WHERE id = %s
         """, (session['colaborador_id'],))
         colaborador = cursor.fetchone()
 
@@ -3116,7 +3112,7 @@ def enviar_ajuste():
             motivo,
             status
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """, (
         session['colaborador_id'],
         data_ajuste,
@@ -3158,7 +3154,7 @@ def alterar_senha_gestor():
     if senha1 == DEFAULT_USER_PASSWORD:
         return "A senha padrão não pode ser utilizada novamente."
 
-    padrao = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$'
+    padrao = r'^(%s=.*[a-z])(%s=.*[A-Z])(%s=.*\d)(%s=.*[@$!%*%s&]).{8,}$'
 
     if not re.match(padrao, senha1):
 
@@ -3175,8 +3171,8 @@ def alterar_senha_gestor():
     with db_cursor(commit=True) as cursor:
         cursor.execute("""
         UPDATE gestores
-        SET senha = ?
-        WHERE id = ?
+        SET senha = %s
+        WHERE id = %s
     """, (
         senha1,
         session['gestor_id']

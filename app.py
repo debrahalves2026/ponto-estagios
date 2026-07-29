@@ -13,6 +13,12 @@ app.secret_key = app_config.SECRET_KEY
 app.teardown_appcontext(close_db_connection)
 app.register_blueprint(main_bp)
 
+if getattr(app_config, 'IS_EPHEMERAL_DB_RISK', False):
+    print(
+        'ALERTA: DATABASE_PATH aponta para a pasta do projeto em ambiente de deploy. '
+        'Configure SQLITE_DB_PATH ou RENDER_DISK_PATH para um disco persistente.'
+    )
+
 criar_tabelas()
 
 if __name__ == '__main__':
